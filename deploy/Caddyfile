@@ -1,0 +1,16 @@
+# TLS is automatic (Let's Encrypt) and renews by itself.
+{$DOMAIN} {
+	encode zstd gzip
+
+	reverse_proxy {$UPSTREAM:hippocampus:8765} {
+		# /mcp streams (SSE): without this the response sits in a buffer
+		flush_interval -1
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		-Server
+	}
+}

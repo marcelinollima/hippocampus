@@ -1,0 +1,29 @@
+# Hippocampus + Caddy (automatic HTTPS with Let's Encrypt).
+#   cp .env.example .env   # set DOMAIN and HIPPOCAMPUS_TOKEN
+#   docker compose up -d
+services:
+  hippocampus:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HIPPOCAMPUS_PUBLIC_URL: https://${DOMAIN}
+    volumes:
+      - ./data:/data
+    # no published port: only Caddy talks to it
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on: [hippocampus]
+    ports: ["80:80", "443:443"]
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  caddy_data:
+  caddy_config:

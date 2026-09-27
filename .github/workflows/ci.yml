@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        python: ["3.10", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python }}
+          cache: pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check .
+      - run: pytest -q
+      - name: Hooks compile
+        run: python -m py_compile clients/claude-code/_client.py clients/claude-code/recall.py clients/claude-code/sync.py clients/claude-code/extract.py clients/claude-code/install.py
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t hippocampus:ci .
+      - name: Smoke test (downloads the embedding model on first start)
+        run: |
+          mkdir -p data && cp -r examples/memories data/ && chmod -R a+rwX data
+          docker run -d --name hc -e HIPPOCAMPUS_TOKEN=ci -e HIPPOCAMPUS_ALLOWED_HOSTS=127.0.0.1:8765 \
+            -v "$PWD/data:/data" -p 8765:8765 hippocampus:ci
+          for i in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/health; then
+              curl -fsS -X POST http://127.0.0.1:8765/api/search -H "Authorization: Bearer ci" \
+                -H "Content-Type: application/json" -d '{"q":"restore a file from backup","k":1}' \
+                | grep -q backup-restic-nas && exit 0
+            fi
+            sleep 5
+          done
+          docker logs hc; exit 1
+
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

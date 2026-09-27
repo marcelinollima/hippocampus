@@ -1,0 +1,15 @@
+# your memories and index never go to git
+data/
+*.db
+*.db-journal
+.env
+token.txt
+
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/

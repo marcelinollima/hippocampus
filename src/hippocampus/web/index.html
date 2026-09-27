@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hippocampus</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<style>
+  :root{
+    --bg:#080b16; --bg2:#0e1426; --line:#1e2a44;
+    --text:#e7ecf7; --dim:#8e9bb5; --accent:#66d9ef; --gold:#ffcc66;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);
+    font:14px/1.5 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+    overflow:hidden}
+  #sky{position:fixed;inset:0}
+  .bar{position:fixed;top:0;left:0;right:0;display:flex;gap:8px;padding:10px 12px;
+    background:linear-gradient(180deg,rgba(8,11,22,.96),rgba(8,11,22,.55));
+    align-items:center;z-index:5;flex-wrap:wrap}
+  .bar h1{font-size:15px;margin:0 8px 0 0;font-weight:600;letter-spacing:.3px;white-space:nowrap}
+  .bar h1 span{color:var(--accent)}
+  input,textarea,select,button{font:inherit;color:var(--text);background:var(--bg2);
+    border:1px solid var(--line);border-radius:8px;padding:8px 10px}
+  input:focus,textarea:focus{outline:1px solid var(--accent)}
+  #q{flex:1;min-width:160px}
+  button{cursor:pointer;background:#16203a;white-space:nowrap}
+  button:hover{border-color:var(--accent)}
+  button.primary{background:var(--accent);color:#04121a;border-color:var(--accent);font-weight:600}
+  .stats{color:var(--dim);font-size:12px;white-space:nowrap}
+  .panel{position:fixed;top:0;right:0;bottom:0;width:min(440px,100%);z-index:6;
+    background:rgba(10,15,30,.97);border-left:1px solid var(--line);
+    padding:16px;overflow:auto;transform:translateX(102%);transition:transform .22s ease;
+    backdrop-filter:blur(6px)}
+  .panel.open{transform:none}
+  .panel h2{font-size:17px;margin:4px 0 2px;word-break:break-word}
+  .meta{color:var(--dim);font-size:12px;margin-bottom:10px}
+  .desc{color:var(--gold);font-size:13px;margin:8px 0 14px}
+  .badge{display:inline-block;font-size:11px;border-radius:999px;padding:1px 8px;margin-left:6px;
+    border:1px solid var(--line);color:var(--dim)}
+  .badge.pending{color:var(--gold);border-color:var(--gold)}
+  pre{white-space:pre-wrap;word-break:break-word;background:#070a13;border:1px solid var(--line);
+    border-radius:8px;padding:10px;font:12px/1.55 ui-monospace,Consolas,monospace;max-height:44vh;overflow:auto}
+  .chip{display:inline-block;background:#16203a;border:1px solid var(--line);border-radius:999px;
+    padding:3px 9px;margin:3px 3px 0 0;font-size:12px;cursor:pointer}
+  .chip:hover{border-color:var(--accent);color:var(--accent)}
+  .close{float:right;background:none;border:none;color:var(--dim);font-size:20px;padding:0 4px}
+  .res{border-bottom:1px solid var(--line);padding:10px 0;cursor:pointer}
+  .res:hover h3{color:var(--accent)}
+  .res h3{margin:0 0 2px;font-size:14px;font-weight:600}
+  .res p{margin:2px 0;color:var(--dim);font-size:12px}
+  .via{font-size:11px;color:var(--accent)}
+  .legend{position:fixed;left:12px;bottom:12px;z-index:5;font-size:11px;color:var(--dim);
+    max-width:230px;max-height:38vh;overflow:auto}
+  .legend div{cursor:pointer;padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
+  .legend div.off{opacity:.3}
+  .field{margin-bottom:10px}
+  .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:3px}
+  .field input,.field textarea,.field select{width:100%}
+  .field textarea{min-height:170px;font:12px/1.5 ui-monospace,Consolas,monospace;resize:vertical}
+  #login{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;
+    align-items:center;justify-content:center;flex-direction:column;gap:12px;padding:20px}
+  .hidden{display:none!important}
+  .warn{color:#ff9d9d;font-size:12px;min-height:16px}
+  text{pointer-events:none;user-select:none}
+</style>
+</head>
+<body>
+
+<div id="login">
+  <h1 style="font-size:20px;margin:0">Hippocampus <span style="color:var(--accent)">·</span> <span data-t="memories"></span></h1>
+  <p style="color:var(--dim);margin:0" data-t="pasteToken"></p>
+  <input id="tk" type="password" placeholder="token" style="width:min(340px,90vw)" autocomplete="current-password">
+  <button class="primary" onclick="login()" data-t="enter"></button>
+  <div class="warn" id="warn"></div>
+</div>
+
+<svg id="sky"></svg>
+
+<div class="bar hidden" id="bar">
+  <h1>Hippocampus<span>·</span></h1>
+  <input id="q" autocomplete="off">
+  <button class="primary" onclick="runSearch()" data-t="search"></button>
+  <button onclick="openEditor()" data-t="newMemory"></button>
+  <button id="btSug" onclick="toggleSuggestions()"></button>
+  <button onclick="reset()">↺</button>
+  <span class="stats" id="stats"></span>
+</div>
+
+<div class="legend hidden" id="legend"></div>
+<div class="panel" id="panel"></div>
+
+<script>
+const I18N = {
+  en: {memories:"memories", pasteToken:"Paste your access token", enter:"Enter",
+    badToken:"Invalid token.", search:"Search", newMemory:"+ memory",
+    placeholder:"ask: “why is the backup server at 100% CPU?”",
+    suggested:"suggested", written:"written", on:"on", off:"off", searching:"Searching…",
+    results:"results", copyCtx:"Copy context block", notFound:"Not found",
+    linksTo:"links to", linkedFrom:"linked from",
+    similar:"similar (suggested by vectors, nobody wrote it)", edit:"Edit",
+    editMemory:"Edit memory", newMem:"New memory", name:"name (slug)",
+    description:"description (one line)", type:"type", project:"project", status:"status",
+    body:"body (markdown · use [[other-memory]] to link)", save:"Save", saving:"saving…",
+    required:"name and body are required"},
+  pt: {memories:"memórias", pasteToken:"Cole o token de acesso", enter:"Entrar",
+    badToken:"Token inválido.", search:"Buscar", newMemory:"+ memória",
+    placeholder:"pergunte: “por que o servidor de backup está em 100% de CPU?”",
+    suggested:"sugeridas", written:"escritas", on:"on", off:"off", searching:"Buscando…",
+    results:"resultados", copyCtx:"Copiar bloco de contexto", notFound:"Não achei",
+    linksTo:"cita", linkedFrom:"citada por",
+    similar:"parecidas (sugerido pelo vetor, ninguém escreveu)", edit:"Editar",
+    editMemory:"Editar memória", newMem:"Nova memória", name:"nome (slug)",
+    description:"descrição (1 linha)", type:"tipo", project:"projeto", status:"status",
+    body:"corpo (markdown · use [[outra-memoria]] para ligar)", save:"Gravar", saving:"gravando…",
+    required:"nome e corpo são obrigatórios"},
+};
+const LANG = ((new URLSearchParams(location.search).get("lang") || navigator.language || "en")
+  .toLowerCase().startsWith("pt")) ? "pt" : "en";
+const t = k => I18N[LANG][k] || I18N.en[k] || k;
+document.documentElement.lang = LANG === "pt" ? "pt-BR" : "en";
+document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
+document.getElementById("q").placeholder = t("placeholder");
+
+// storage can be unavailable (private windows, blocked site data)
+const store = {
+  get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+  set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
+};
+
+const API = location.origin;
+let TOKEN = store.get("hippocampus_token") || "";
+let data = {nodes:[], edges:[], suggestions:[]};
+let sim, node, edge, suggested, label, hidden = new Set();
+let showSug = store.get("hippocampus_sug") !== "off";
+const colors = d3.scaleOrdinal(d3.schemeTableau10.concat(d3.schemeSet3));
+
+function api(route, opt={}){
+  return fetch(API + route, Object.assign({headers:{
+    "Authorization":"Bearer " + TOKEN, "Content-Type":"application/json"}}, opt));
+}
+
+async function load(){
+  const r = await api("/api/graph");
+  if(!r.ok) return false;
+  data = await r.json();
+  ["login"].forEach(id => document.getElementById(id).classList.add("hidden"));
+  ["bar","legend"].forEach(id => document.getElementById(id).classList.remove("hidden"));
+  draw();
+  return true;
+}
+
+async function login(){
+  TOKEN = document.getElementById("tk").value.trim();
+  if(await load()) store.set("hippocampus_token", TOKEN);
+  else document.getElementById("warn").textContent = t("badToken");
+}
+
+const radius = d => 4 + Math.min(Math.sqrt(d.degree)*2.2, 13);
+
+function draw(){
+  const svg = d3.select("#sky");
+  svg.selectAll("*").remove();
+  const W = window.innerWidth, H = window.innerHeight;
+  svg.attr("viewBox", [0,0,W,H]);
+  const g = svg.append("g");
+  const zoom = d3.zoom().scaleExtent([.25,6]).on("zoom", e => g.attr("transform", e.transform));
+  svg.call(zoom);
+  // once the layout settles, zoom so the whole constellation fills the screen
+  // (a small memory otherwise sits as a tiny cluster in the middle)
+  let fitted = false;
+  const fit = () => {
+    if(fitted || !nodes.length) return;
+    fitted = true;
+    const xs = nodes.map(d=>d.x), ys = nodes.map(d=>d.y);
+    const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+    const k = Math.max(.25, Math.min(3, .8 * Math.min(W / (x1-x0 || 1), (H-70) / (y1-y0 || 1))));
+    svg.call(zoom.transform,
+      d3.zoomIdentity.translate(W/2, 35 + (H-35)/2).scale(k).translate(-(x0+x1)/2, -(y0+y1)/2));
+  };
+
+  const nodes = data.nodes.map(d => Object.assign({}, d));
+  const idx = new Map(nodes.map(d => [d.id, d]));
+  const edges = data.edges.filter(a => idx.has(a.from) && idx.has(a.to))
+                  .map(a => ({source:a.from, target:a.to}));
+  const sugs = (data.suggestions||[]).filter(a => idx.has(a.from) && idx.has(a.to))
+                  .map(a => ({source:a.from, target:a.to, sim:a.sim}));
+
+  document.getElementById("stats").textContent = nodes.length + " " + t("memories") + " · " +
+    edges.length + " " + t("written") + " · " + sugs.length + " " + t("suggested");
+  document.getElementById("btSug").textContent = t("suggested") + ": " + t(showSug ? "on" : "off");
+
+  // dashed and faint = text similarity only, nobody claimed it
+  suggested = g.append("g").selectAll("line").data(sugs).join("line")
+    .attr("stroke","#4a6f8a").attr("stroke-width",.7).attr("stroke-dasharray","3,4")
+    .attr("stroke-opacity", showSug ? .3 : 0);
+  edge = g.append("g").selectAll("line").data(edges).join("line")
+    .attr("stroke","#243354").attr("stroke-width",.8).attr("stroke-opacity",.55);
+
+  node = g.append("g").selectAll("circle").data(nodes).join("circle")
+    .attr("r", radius)
+    .attr("fill", d => colors(d.project))
+    .attr("fill-opacity", d => d.status === "resolved" || d.status === "superseded" ? .35 : 1)
+    .attr("stroke", d => d.status === "pending" ? "#ffcc66" : "#0a0f1e")
+    .attr("stroke-width", d => d.status === "pending" ? 1.8 : 1.2)
+    .style("cursor","pointer")
+    .on("click", (e,d) => { e.stopPropagation(); openMemory(d.id); })
+    .call(d3.drag()
+      .on("start",(e,d)=>{ if(!e.active) sim.alphaTarget(.25).restart(); d.fx=d.x; d.fy=d.y; })
+      .on("drag",(e,d)=>{ d.fx=e.x; d.fy=e.y; })
+      .on("end",(e,d)=>{ if(!e.active) sim.alphaTarget(0); d.fx=null; d.fy=null; }));
+  node.append("title").text(d => d.id + "\n" + d.description);
+
+  label = g.append("g").selectAll("text").data(nodes).join("text")
+    .text(d => d.id.replace(/-/g," "))
+    .attr("font-size", d => d.degree > 6 ? 9 : 7.5)
+    .attr("fill", d => d.degree > 6 ? "#cdd8ee" : "#5d6b86")
+    .attr("dy", d => -(3 + radius(d)))
+    .attr("text-anchor","middle");
+
+  sim = d3.forceSimulation(nodes)
+    .force("link", d3.forceLink(edges).id(d=>d.id).distance(58).strength(.35))
+    // suggested edges pull gently: they bring an orphan near its topic without
+    // bending the shape that written links already give
+    .force("sug", d3.forceLink(sugs).id(d=>d.id).distance(90).strength(.06))
+    .force("charge", d3.forceManyBody().strength(-95))
+    .force("center", d3.forceCenter(W/2, H/2))
+    // weak gravity: without it a memory with no links drifts off-screen
+    .force("x", d3.forceX(W/2).strength(.05))
+    .force("y", d3.forceY(H/2).strength(.05))
+    .force("collide", d3.forceCollide().radius(d => 5 + radius(d)))
+    .on("tick", () => {
+      edge.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+          .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      suggested.attr("x1",d=>d.source.x).attr("y1",d=>d.source.y)
+               .attr("x2",d=>d.target.x).attr("y2",d=>d.target.y);
+      node.attr("cx",d=>d.x).attr("cy",d=>d.y);
+      label.attr("x",d=>d.x).attr("y",d=>d.y);
+      if(sim.alpha() < .08) fit();
+    });
+
+  const projects = [...new Set(nodes.map(d=>d.project))].sort();
+  const leg = d3.select("#legend").html("");
+  projects.forEach(p => {
+    const n = nodes.filter(x=>x.project===p).length;
+    leg.append("div").classed("off", hidden.has(p))
+      .html('<i style="background:'+colors(p)+'"></i>'+esc(p)+" ("+n+")")
+      .on("click", function(){
+        hidden.has(p) ? hidden.delete(p) : hidden.add(p);
+        this.classList.toggle("off");
+        filterProjects();
+      });
+  });
+  filterProjects();
+}
+
+function filterProjects(){
+  const vis = d => !hidden.has(d.project);
+  node.style("display", d => vis(d) ? null : "none");
+  label.style("display", d => vis(d) ? null : "none");
+  edge.style("display", d => vis(d.source) && vis(d.target) ? null : "none");
+  suggested.style("display", d => vis(d.source) && vis(d.target) ? null : "none");
+}
+
+function toggleSuggestions(){
+  showSug = !showSug;
+  store.set("hippocampus_sug", showSug ? "on" : "off");
+  document.getElementById("btSug").textContent = t("suggested") + ": " + t(showSug ? "on" : "off");
+  suggested.attr("stroke-opacity", showSug ? .3 : 0);
+}
+
+function reset(){
+  node.attr("opacity",1);
+  label.attr("opacity",1);
+  edge.attr("stroke-opacity",.55);
+  suggested.attr("stroke-opacity", showSug ? .3 : 0);
+  closePanel();
+}
+
+function panel(html){
+  const p = document.getElementById("panel");
+  p.classList.add("open");
+  p.innerHTML = '<button class="close" onclick="closePanel()">×</button>' + html;
+}
+
+const chip = (name, prefix, dashed) =>
+  '<span class="chip"' + (dashed ? ' style="border-style:dashed"' : '') +
+  ' data-open="' + esc(name) + '">' + prefix + esc(name) + '</span>';
+
+document.getElementById("panel").addEventListener("click", e => {
+  const el = e.target.closest("[data-open]");
+  if(el) openMemory(el.dataset.open);
+});
+
+async function runSearch(){
+  const q = document.getElementById("q").value.trim();
+  if(!q) return;
+  panel('<h2>' + t("searching") + '</h2>');
+  const d = await (await api("/api/search", {method:"POST", body: JSON.stringify({q, k:8})})).json();
+  const hit = new Set(d.results.map(x=>x.name));
+  node.attr("opacity", n => hit.has(n.id) ? 1 : .12);
+  label.attr("opacity", n => hit.has(n.id) ? 1 : .12);
+  edge.attr("stroke-opacity", a => hit.has(a.source.id) && hit.has(a.target.id) ? .95 : .08);
+
+  let h = '<h2>' + d.results.length + ' ' + t("results") + '</h2><div class="meta">' + esc(q) + '</div>';
+  d.results.forEach(x => {
+    h += '<div class="res" data-open="' + esc(x.name) + '"><h3>' + esc(x.name.replace(/-/g," ")) +
+      badge(x.status) + '</h3><p>' + esc(x.description||"") + '</p>' +
+      '<p class="via">' + esc(x.via) + ' · ' + esc(x.project) + ' · ' + esc(x.modified.slice(0,10)) + '</p></div>';
+  });
+  h += '<p style="margin-top:14px"><button id="btCopy">' + t("copyCtx") + '</button></p>';
+  panel(h);
+  document.getElementById("btCopy").onclick = () => navigator.clipboard.writeText(d.context || "");
+}
+
+const badge = s => s && s !== "active" ? '<span class="badge ' + esc(s) + '">' + esc(s) + '</span>' : "";
+
+async function openMemory(name){
+  panel('<h2>…</h2>');
+  const m = await (await api("/api/memory?name=" + encodeURIComponent(name))).json();
+  if(m.error){
+    panel('<h2>' + t("notFound") + '</h2><div class="meta">' + esc(m.error) + '</div>' +
+      (m.similar_names||[]).map(x => chip(x, "")).join(""));
+    return;
+  }
+  const to = (m.links_to||[]).map(x => chip(x, "→ ")).join("");
+  const from = (m.linked_from||[]).map(x => chip(x, "← ")).join("");
+  const sim = (m.similar||[]).map(x => chip(x, "~ ", true)).join("");
+  panel('<h2>' + esc(m.name.replace(/-/g," ")) + badge(m.status) + '</h2>' +
+    '<div class="meta">' + esc(m.type) + ' · ' + esc(m.project) + ' · ' + esc((m.modified||"").slice(0,10)) + '</div>' +
+    '<div class="desc">' + esc(m.description||"") + '</div>' +
+    (to ? '<div class="meta">' + t("linksTo") + '</div>' + to : '') +
+    (from ? '<div class="meta" style="margin-top:8px">' + t("linkedFrom") + '</div>' + from : '') +
+    (sim ? '<div class="meta" style="margin-top:8px">' + t("similar") + '</div>' + sim : '') +
+    '<pre>' + esc(m.body||"") + '</pre><button id="btEdit">' + t("edit") + '</button>');
+  document.getElementById("btEdit").onclick = () => openEditor(m);
+}
+
+function openEditor(m={}){
+  const opt = (list, cur) => list.map(x => '<option' + (x===cur?" selected":"") + '>' + x + '</option>').join("");
+  panel('<h2>' + t(m.name ? "editMemory" : "newMem") + '</h2>' +
+    '<div class="field"><label>' + t("name") + '</label><input id="f_name" value="' + esc(m.name||"") + '"></div>' +
+    '<div class="field"><label>' + t("description") + '</label><input id="f_desc" value="' + esc(m.description||"") + '"></div>' +
+    '<div class="field"><label>' + t("type") + '</label><select id="f_type">' +
+      opt(["project","reference","feedback","user"], m.type||"project") + '</select></div>' +
+    '<div class="field"><label>' + t("status") + '</label><select id="f_status">' +
+      opt(["active","pending","resolved","superseded"], m.status||"active") + '</select></div>' +
+    '<div class="field"><label>' + t("project") + '</label><input id="f_proj" value="' + esc(m.project||"general") + '"></div>' +
+    '<div class="field"><label>' + t("body") + '</label><textarea id="f_body">' + esc(m.body||"") + '</textarea></div>' +
+    '<button class="primary" id="btSave">' + t("save") + '</button> <span class="warn" id="f_warn"></span>');
+  document.getElementById("btSave").onclick = save;
+}
+
+async function save(){
+  const val = id => document.getElementById(id).value;
+  const warn = document.getElementById("f_warn");
+  const name = val("f_name").trim(), body = val("f_body");
+  if(!name || !body.trim()){ warn.textContent = t("required"); return; }
+  warn.textContent = t("saving");
+  const d = await (await api("/api/memory", {method:"POST", body: JSON.stringify({
+    name, description: val("f_desc"), type: val("f_type"), status: val("f_status"),
+    project: val("f_proj"), body })})).json();
+  if(d.error){ warn.textContent = d.error; return; }
+  await load();
+  openMemory(d.name);
+}
+
+function closePanel(){ document.getElementById("panel").classList.remove("open"); }
+function esc(s){ return String(s||"").replace(/[&<>"']/g, c =>
+  ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+
+document.getElementById("q").addEventListener("keydown", e => { if(e.key==="Enter") runSearch(); });
+document.getElementById("tk").addEventListener("keydown", e => { if(e.key==="Enter") login(); });
+window.addEventListener("resize", () => { if(data.nodes.length) draw(); });
+if(TOKEN) load();
+</script>
+</body>
+</html>
