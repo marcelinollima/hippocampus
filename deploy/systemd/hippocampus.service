@@ -1,7 +1,7 @@
 # Bare-metal alternative to Docker. Install:
 #   sudo useradd --system --create-home --home-dir /opt/hippocampus hippocampus
 #   sudo -u hippocampus python3 -m venv /opt/hippocampus/.venv
-#   sudo -u hippocampus /opt/hippocampus/.venv/bin/pip install hippocampus-mcp
+#   sudo -u hippocampus /opt/hippocampus/.venv/bin/pip install git+https://github.com/marcelinollima/hippocampus
 #   sudo cp .env.example /opt/hippocampus/.env   # and edit it
 #   sudo cp hippocampus.service /etc/systemd/system/ && sudo systemctl enable --now hippocampus
 # Put Caddy (deploy/Caddyfile with UPSTREAM=127.0.0.1:8765) or another TLS proxy in front.

@@ -100,7 +100,7 @@ If you don't use Docker, see [deploy/systemd](deploy/systemd/hippocampus.service
 To try it locally first:
 
 ```bash
-pip install hippocampus-mcp
+pip install git+https://github.com/marcelinollima/hippocampus
 export HIPPOCAMPUS_TOKEN=$(hippocampus token)
 mkdir -p data && cp -r examples/memories data/
 hippocampus serve            # http://127.0.0.1:8765
