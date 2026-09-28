@@ -11,6 +11,8 @@ from .store import slug
 STATUS_WEIGHT = {"resolved": 0.8, "superseded": 0.6}
 RRF_K = 60
 NAME_BOOST = 0.006
+MEMORY_WINDOW = 40   # memories that get a "meaning" rank
+CHUNK_WINDOW = 400   # chunks scanned to find them
 
 STOPWORDS = {
     # en
@@ -78,7 +80,10 @@ def search(store, q, k=6, expand=True, limit=1200):
             print("embedding failed, falling back to BM25:", type(e).__name__, e, flush=True)
     if qv is not None:
         sims = store.vectors["m"] @ qv
-        top = np.argsort(-sims)[:80]
+        # The window is counted in MEMORIES, not chunks: a fixed chunk window
+        # shrinks as notes get longer (more chunks each), and a key memory
+        # whose best chunk sat at #93 fell out of an 80-chunk window.
+        top = np.argsort(-sims)[:CHUNK_WINDOW]
         ids = [int(store.vectors["ids"][i]) for i in top]
         ph = ",".join("?" * len(ids))
         chunk_map = {r["id"]: (r["memory_id"], r["text"]) for r in c.execute(
@@ -94,6 +99,8 @@ def search(store, q, k=6, expand=True, limit=1200):
             best_chunk[mid] = text
             add(mid, 1.0 / (RRF_K + pos), "meaning")
             pos += 1
+            if pos >= MEMORY_WINDOW:
+                break
 
     # 3) Nudge by NAME: "change screen X of the foo system" does not look like
     # "the foo repo lives in C:\\..." by meaning. If the question names a
