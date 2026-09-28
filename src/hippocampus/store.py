@@ -346,6 +346,17 @@ class Store:
         path = (self.cfg.memory_dir / rel).resolve()
         if self.cfg.memory_dir.resolve() not in path.parents or path.suffix != ".md":
             return {"error": "invalid path"}
+        # Same memory under another file name (`db_access.md` locally, saved as
+        # `db-access.md` on the server): write over the existing file instead of
+        # creating a second copy that competes with it in every search.
+        meta, _ = parse_md(content)
+        c = self.connect()
+        row = c.execute("SELECT path FROM memories WHERE name=? AND project=?",
+                        (slug(meta.get("name") or path.stem), project_from_path(rel))).fetchone()
+        c.close()
+        if row and row["path"] != rel:
+            rel = row["path"]
+            path = self.cfg.memory_dir / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(content, encoding="utf-8")
         return {"ok": True, "path": rel}

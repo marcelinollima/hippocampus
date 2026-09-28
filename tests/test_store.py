@@ -94,6 +94,16 @@ def test_import_file_rejects_path_traversal(store):
     assert store.import_file("infra/ok.md", "---\nname: ok\n---\n\nhi")["ok"]
 
 
+def test_import_reuses_existing_file_for_same_memory(store, cfg):
+    r = store.import_file("infra/backup_restic_nas.md",
+                          "---\nname: backup_restic_nas\n---\n\nnew text")
+    assert r["path"] == "infra/backup-restic-nas.md"
+    assert not (cfg.memory_dir / "infra" / "backup_restic_nas.md").exists()
+    store.sync(log=quiet)
+    assert store.stats()["memories"] == 7
+    assert "new text" in store.get("backup-restic-nas")["body"]
+
+
 def test_pinned_text_stops_at_marker(store):
     t = store.pinned_text()
     assert "the shop" in t and "END-PINNED" not in t and "searchable" not in t
