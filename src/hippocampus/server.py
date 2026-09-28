@@ -9,6 +9,7 @@ from starlette.requests import Request
 from starlette.responses import FileResponse, JSONResponse, PlainTextResponse
 
 from . import __version__
+from .i18n import text
 from .search import context_block, search
 from .store import Store
 
@@ -27,13 +28,16 @@ def create_app(cfg, store=None, warmup=True):
     store = store or Store(cfg)
     mcp = MCPServer(name="hippocampus", instructions=cfg.instructions)
 
+    def say(key, **kw):
+        return text(cfg.lang, key, **kw)
+
     # -- MCP tools --------------------------------------------------------
 
     @mcp.tool(description="Search memories by meaning + keywords + link graph. Use it BEFORE "
                           "touching any server, database or system of " + cfg.owner + ".")
     def search_memory(query: str, limit: int = 6) -> str:
         res = search(store, query, max(1, min(limit, 15)))
-        return context_block(query, res) or "No memory found for: " + query
+        return context_block(query, res, cfg.lang) or say("not_found", q=query)
 
     @mcp.tool(description="Read a whole memory by name, with what it links to, what links "
                           "to it and similar memories.")
@@ -60,15 +64,17 @@ def create_app(cfg, store=None, warmup=True):
         rows = store.pending(project)
         return "\n".join("- [%s] %s (%s): %s" % (r["project"], r["name"],
                                                 (r["modified"] or "")[:10], r["description"] or "")
-                         for r in rows) or "(no pending memories)"
+                         for r in rows) or say("no_pending")
 
     @mcp.tool(description="List the memories of a project; without arguments, list projects.")
     def list_memories(project: str = "") -> str:
         rows = store.list(project)
         if project:
             return "\n".join("- %s (%s): %s" % (r["name"], (r["modified"] or "")[:10],
-                                                r["description"] or "") for r in rows) or "(empty)"
-        return "\n".join("- %s: %d memories" % (r["project"], r["n"]) for r in rows) or "(empty)"
+                                                r["description"] or "")
+                             for r in rows) or say("empty")
+        return "\n".join("- %s: %s" % (r["project"], say("n_memories", n=r["n"]))
+                         for r in rows) or say("empty")
 
     # -- REST API (used by the web UI and the Claude Code hooks) ---------
 
@@ -99,6 +105,7 @@ def create_app(cfg, store=None, warmup=True):
             return deny()
         d = await req.json()
         q = str(d.get("q", ""))
+        lang = d.get("lang") or cfg.lang  # a client may ask for its own language
         # The hook sends expand=false and a short limit: it fires on every
         # message and must not eat the context window. MCP (a deliberate
         # search) uses the deeper defaults.
@@ -107,9 +114,9 @@ def create_app(cfg, store=None, warmup=True):
         pinned = store.pinned_text() if d.get("pinned") else ""
         if pinned:  # it already goes in full on top: repeating it is waste
             res = [x for x in res if x["name"] != store.cfg.pinned]
-        ctx = context_block(q, res)
+        ctx = context_block(q, res, lang)
         if pinned:
-            ctx = "# Pinned\n\n" + pinned + ("\n\n" + ctx if ctx else "")
+            ctx = text(lang, "pinned") + "\n\n" + pinned + ("\n\n" + ctx if ctx else "")
         return JSONResponse({"results": res, "context": ctx})
 
     @mcp.custom_route("/api/memory", methods=["GET", "POST"])

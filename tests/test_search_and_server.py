@@ -67,3 +67,11 @@ def test_import_endpoint_indexes_new_files(store):
     assert r.json()["sync"]["memories"] == 8
     assert c.post("/api/import", headers=AUTH,
                   json={"files": [{"path": "../x.md", "content": ""}]}).status_code == 400
+
+
+def test_search_endpoint_answers_in_the_language_asked(store):
+    c = client(store)
+    body = {"q": "deploy the shop api", "pinned": True, "expand": False}
+    assert c.post("/api/search", headers=AUTH, json=body).json()["context"].startswith("# Pinned")
+    pt = c.post("/api/search", headers=AUTH, json={**body, "lang": "pt"}).json()["context"]
+    assert pt.startswith("# Fixada") and "# Memórias relevantes para:" in pt

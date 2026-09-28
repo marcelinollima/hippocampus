@@ -4,6 +4,20 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+Hippocampus now speaks English and Portuguese end to end, not only in the web UI.
+
+### Added
+- `HIPPOCAMPUS_LANG` (`en` | `pt`): default MCP instructions, tool replies and the
+  context block injected into Claude in the chosen language.
+- `/api/search` accepts `lang`, so each client can ask for its own language.
+- Claude Code installer `--lang`: recall header and extracted memories in that language.
+- Web UI: EN/PT button; the choice is remembered in the browser.
+
+### Unchanged on purpose
+- Tool names, statuses, types and API fields are the same in every language.
+
 ## [0.2.0] - 2026-09-28
 
 Running on your own computer is now a first-class option, not just a trial.

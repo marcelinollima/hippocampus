@@ -7,6 +7,8 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .i18n import norm, text
+
 # One folder per user for everything: the server's data and token, and the
 # Claude Code client's config and hooks. A fixed place (not the current
 # directory) is what lets the server start on its own at login.
@@ -14,25 +16,6 @@ HOME = Path.home() / ".hippocampus"
 DEFAULT_TOKEN_FILE = HOME / "server-token"
 
 DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
-
-DEFAULT_INSTRUCTIONS = """\
-Long-term memory shared by every Claude session of {owner}: servers, databases,
-projects, decisions and the recipes that are known to work.
-
-READ: call search_memory before touching any server, database or system of
-{owner}. The approved way of doing it is probably already written down here.
-
-WRITE: new memories go through save_memory, NOT to local files, so they are
-visible from every machine and every project. Set `project` to the project the
-fact belongs to, `type` to one of project/reference/feedback/user, and link to
-existing memories with [[other-memory-name]] in the body. Hand-written links
-carry relationships that similarity search cannot infer.
-
-VALIDITY: every memory has a status (active | pending | resolved | superseded).
-When something a memory listed as pending gets done, call mark_memory with
-status resolved and a short note; otherwise it keeps showing up as open. New
-memories about unfinished work start as pending. For "what is still pending?",
-use list_pending."""
 
 
 def _env(name, default=""):
@@ -54,6 +37,7 @@ class Config:
     model: str
     owner: str
     instructions: str
+    lang: str
     host: str
     port: int
     allowed_hosts: list = field(default_factory=list)
@@ -76,13 +60,14 @@ class Config:
             hosts += [public, public + ":443"]
         hosts += ["localhost:%d" % port, "127.0.0.1:%d" % port, "localhost", "127.0.0.1"]
 
+        lang = norm(_env("LANG", "en"))
         owner = _env("OWNER", "the user")
         instructions = _env("INSTRUCTIONS")
         instructions_file = _env("INSTRUCTIONS_FILE")
         if not instructions and instructions_file and Path(instructions_file).exists():
             instructions = Path(instructions_file).read_text(encoding="utf-8").strip()
         if not instructions:
-            instructions = DEFAULT_INSTRUCTIONS.format(owner=owner)
+            instructions = text(lang, "instructions", owner=owner)
 
         return cls(
             data_dir=data,
@@ -94,6 +79,7 @@ class Config:
             model=_env("MODEL", DEFAULT_MODEL),
             owner=owner,
             instructions=instructions,
+            lang=lang,
             host=_env("HOST", "127.0.0.1"),
             port=port,
             allowed_hosts=list(dict.fromkeys(hosts)),

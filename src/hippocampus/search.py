@@ -4,6 +4,7 @@ import sqlite3
 
 import numpy as np
 
+from .i18n import text
 from .store import slug
 
 # Resolved/superseded memories stay findable but lose to what is still valid.
@@ -157,19 +158,20 @@ def search(store, q, k=6, expand=True, limit=1200):
     return out
 
 
-def context_block(q, results):
+def context_block(q, results, lang="en"):
     """Plain-text block meant to be injected into a model's context."""
     if not results:
         return ""
-    p = ["# Relevant memories for: " + q, ""]
+    p = [text(lang, "ctx_title", q=q), ""]
     for r in results:
         st = r.get("status") or "active"
         label = "" if st == "active" else " | " + st.upper() + (
-            " on " + r["status_at"][:10] if r.get("status_at") else "")
-        p.append("## %s  (%s | project %s | %s%s | via %s)" % (
-            r["name"], r["type"], r["project"], r["modified"][:10], label, r["via"]))
+            " " + text(lang, "ctx_on") + " " + r["status_at"][:10] if r.get("status_at") else "")
+        p.append("## %s  (%s | %s %s | %s%s | via %s)" % (
+            r["name"], r["type"], text(lang, "ctx_project"), r["project"], r["modified"][:10],
+            label, r["via"]))
         p.append("_" + (r["description"] or "") + "_")
         p.append(r["excerpt"])
         p.append("")
-    p.append("> Old facts may be stale: check the date before acting on them.")
+    p.append(text(lang, "ctx_stale"))
     return "\n".join(p)

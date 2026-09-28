@@ -25,6 +25,7 @@ from datetime import datetime
 import _client
 
 STATE = _client.HOME / "extract-state.json"
+LANGUAGES = {"en": "English", "pt": "Brazilian Portuguese"}
 TOOLS = ("search_memory", "read_memory", "save_memory", "mark_memory",
          "list_pending", "list_memories")
 
@@ -57,7 +58,7 @@ Do, in this order:
    save_memory on an existing memory, read it first with read_memory and keep
    ALL the old content - never shorten it.
    New memories: `project` = the subject's project; link to existing ones with
-   [[name]]; plain language; absolute dates.
+   [[name]]; plain language; absolute dates. Write in {language}.
 
 Do not save: a summary of the conversation, obvious things, what is already
 in memory. Having nothing to do is normal. Finish with a short list of what
@@ -167,7 +168,8 @@ def run(transcript, session):
                "Bash,PowerShell,Edit,Write,NotebookEdit,WebFetch,WebSearch,Agent"]
         if claude.lower().endswith((".cmd", ".bat")):
             cmd = ["cmd", "/c"] + cmd
-        prompt = PROMPT.format(owner=cfg["owner"], today=datetime.now().strftime("%Y-%m-%d"))
+        prompt = PROMPT.format(owner=cfg["owner"], language=LANGUAGES.get(cfg["lang"], "English"),
+                               today=datetime.now().strftime("%Y-%m-%d"))
         t0 = time.time()
         with tempfile.TemporaryFile("w+", encoding="utf-8") as stdin:
             stdin.write(prompt + text)

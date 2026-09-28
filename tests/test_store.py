@@ -119,3 +119,13 @@ def test_suggest_links_is_idempotent(store):
     a = suggest_links(store, 0.2, log=quiet)
     b = suggest_links(store, 0.2, log=quiet)
     assert a == b
+
+
+def test_lang_picks_default_instructions(cfg, monkeypatch):
+    from hippocampus.config import Config
+    from hippocampus.i18n import norm
+    assert cfg.lang == "en" and cfg.instructions.startswith("Long-term memory")
+    monkeypatch.setenv("HIPPOCAMPUS_LANG", "pt-BR")
+    pt = Config.from_env()
+    assert pt.lang == "pt" and pt.instructions.startswith("Memória de longo prazo")
+    assert norm("klingon") == "en"

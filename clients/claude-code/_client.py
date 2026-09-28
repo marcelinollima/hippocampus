@@ -18,6 +18,8 @@ DEFAULTS = {
     "token": "",
     "server_name": "hippocampus",
     "owner": "the user",
+    # en | pt: language of the recall header and of the memories extract writes
+    "lang": "en",
     # folders shaped like <root>/<project-slug>/memory/*.md (Claude Code's own layout)
     "sync_roots": ["~/.claude/projects"],
     # other folders with memories: [{"path": "...", "project": "..."}]

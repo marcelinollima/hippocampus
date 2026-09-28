@@ -24,7 +24,7 @@ def fake_embed(texts):
 
 @pytest.fixture
 def cfg(tmp_path, monkeypatch):
-    for k in ("DATA_DIR", "MEMORY_DIR", "DB_PATH", "TOKEN", "PINNED", "URL_SECRET"):
+    for k in ("DATA_DIR", "MEMORY_DIR", "DB_PATH", "TOKEN", "PINNED", "URL_SECRET", "LANG"):
         monkeypatch.delenv("HIPPOCAMPUS_" + k, raising=False)
     monkeypatch.setenv("HIPPOCAMPUS_DATA_DIR", str(tmp_path))
     monkeypatch.setenv("HIPPOCAMPUS_TOKEN", "test-token")

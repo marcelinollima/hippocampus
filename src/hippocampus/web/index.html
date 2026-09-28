@@ -74,6 +74,7 @@
   <input id="tk" type="password" placeholder="token" style="width:min(340px,90vw)" autocomplete="current-password">
   <button class="primary" onclick="login()" data-t="enter"></button>
   <div class="warn" id="warn"></div>
+  <button class="lang" onclick="switchLang()"></button>
 </div>
 
 <svg id="sky"></svg>
@@ -85,6 +86,7 @@
   <button onclick="openEditor()" data-t="newMemory"></button>
   <button id="btSug" onclick="toggleSuggestions()"></button>
   <button onclick="reset()">↺</button>
+  <button class="lang" onclick="switchLang()"></button>
   <span class="stats" id="stats"></span>
 </div>
 
@@ -116,18 +118,28 @@ const I18N = {
     body:"corpo (markdown · use [[outra-memoria]] para ligar)", save:"Gravar", saving:"gravando…",
     required:"nome e corpo são obrigatórios"},
 };
-const LANG = ((new URLSearchParams(location.search).get("lang") || navigator.language || "en")
-  .toLowerCase().startsWith("pt")) ? "pt" : "en";
-const t = k => I18N[LANG][k] || I18N.en[k] || k;
-document.documentElement.lang = LANG === "pt" ? "pt-BR" : "en";
-document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
-document.getElementById("q").placeholder = t("placeholder");
-
 // storage can be unavailable (private windows, blocked site data)
 const store = {
   get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
   set(k,v){ try { localStorage.setItem(k,v); } catch(e){} },
 };
+
+// ?lang= wins, then the language picked with the EN/PT button, then the browser's
+const LANG = ((new URLSearchParams(location.search).get("lang") || store.get("hippocampus_lang")
+  || navigator.language || "en").toLowerCase().startsWith("pt")) ? "pt" : "en";
+const t = k => I18N[LANG][k] || I18N.en[k] || k;
+document.documentElement.lang = LANG === "pt" ? "pt-BR" : "en";
+document.querySelectorAll("[data-t]").forEach(el => el.textContent = t(el.dataset.t));
+document.getElementById("q").placeholder = t("placeholder");
+document.querySelectorAll(".lang").forEach(el => {
+  el.textContent = LANG === "pt" ? "EN" : "PT";
+  el.title = LANG === "pt" ? "Switch to English" : "Mudar para português";
+});
+
+function switchLang(){
+  store.set("hippocampus_lang", LANG === "pt" ? "en" : "pt");
+  location.href = location.pathname;  // drops a ?lang= that would win again
+}
 
 const API = location.origin;
 let TOKEN = store.get("hippocampus_token") || "";

@@ -109,7 +109,7 @@ git clone https://github.com/marcelinollima/hippocampus && cd hippocampus
 pip install .
 hippocampus init        # cria ~/.hippocampus com a pasta de dados e um token
 hippocampus autostart   # liga o servidor agora e a cada login (sem terminal aberto)
-python clients/claude-code/install.py --url http://127.0.0.1:8765
+python clients/claude-code/install.py --url http://127.0.0.1:8765 --lang pt
 ```
 
 Pronto: abra uma sessão nova do Claude Code. A interface web fica em
@@ -136,7 +136,7 @@ Sem Docker, veja [deploy/systemd](deploy/systemd/hippocampus.service). Depois,
 em cada máquina onde você usa o Claude Code:
 
 ```bash
-python clients/claude-code/install.py --url https://memoria.exemplo.com.br --token <TOKEN>
+python clients/claude-code/install.py --url https://memoria.exemplo.com.br --token <TOKEN> --lang pt
 ```
 
 O instalador registra o servidor MCP (escopo de usuário) e os três hooks.
@@ -195,13 +195,17 @@ Toda a configuração do servidor é feita por variáveis de ambiente. O
 |---|---|
 | `HIPPOCAMPUS_TOKEN` | token de acesso do MCP, da API e da web (**obrigatório**) |
 | `HIPPOCAMPUS_OWNER` | seu nome, usado nas instruções que o Claude recebe |
+| `HIPPOCAMPUS_LANG` | `en` (padrão) ou `pt`: idioma das instruções do MCP e do que o servidor escreve no contexto do Claude |
 | `HIPPOCAMPUS_PINNED` | uma memória que vai no topo de **toda** busca automática, por exemplo um mapa "apelido → repo, servidor, banco" |
 | `HIPPOCAMPUS_URL_SECRET` | habilita `/mcp/<segredo>` para clientes que não mandam cabeçalho, como os conectores personalizados do claude.ai ([guia](docs/claude-ai.md)) |
 | `HIPPOCAMPUS_MODEL` | qualquer modelo de texto do [fastembed](https://qdrant.github.io/fastembed/examples/Supported_Models/) |
 
 O lado do cliente fica em `~/.hippocampus/client.json`, que é criado pelo
 instalador. Lá dá pra mapear pastas locais para projetos do servidor,
-adicionar outras pastas de memória ou desligar a extração automática.
+adicionar outras pastas de memória ou desligar a extração automática. Instale
+com `--lang pt` para receber em português o cabeçalho da busca automática e
+as memórias extraídas no fim da sessão. A interface web segue o idioma do
+navegador e tem um botão EN/PT para trocar.
 
 ## Segurança
 

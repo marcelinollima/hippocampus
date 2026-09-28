@@ -97,6 +97,8 @@ def install(a):
     cfg.update({"url": url, "token": a.token, "server_name": a.name})
     if a.owner:
         cfg["owner"] = a.owner
+    if a.lang:
+        cfg["lang"] = a.lang
     cfg.setdefault("extract", {})["enabled"] = not a.no_extract
     cfg_file.write_text(json.dumps(cfg, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     try:
@@ -136,6 +138,8 @@ def main():
                                     "default: ~/.hippocampus/server-token (hippocampus init)")
     ap.add_argument("--name", default="hippocampus", help="MCP server name (default: hippocampus)")
     ap.add_argument("--owner", help="your name, used in the extraction prompt")
+    ap.add_argument("--lang", choices=("en", "pt"),
+                    help="language of the recall header and extracted memories (default: en)")
     ap.add_argument("--no-extract", action="store_true",
                     help="skip automatic extraction at the end of sessions (uses `claude -p`)")
     ap.add_argument("--uninstall", action="store_true")

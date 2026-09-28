@@ -187,13 +187,17 @@ documents each of them. The most useful ones:
 |---|---|
 | `HIPPOCAMPUS_TOKEN` | bearer token for MCP, API and web UI (**required**) |
 | `HIPPOCAMPUS_OWNER` | your name, used in the instructions Claude receives |
+| `HIPPOCAMPUS_LANG` | `en` (default) or `pt`: language of the MCP instructions and of what the server writes into Claude's context |
 | `HIPPOCAMPUS_PINNED` | a memory injected on top of **every** recall, e.g. a map of "nickname → repo, server, database" |
 | `HIPPOCAMPUS_URL_SECRET` | enables `/mcp/<secret>` for clients that can't send headers, such as claude.ai custom connectors ([guide](docs/claude-ai.md)) |
 | `HIPPOCAMPUS_MODEL` | any [fastembed](https://qdrant.github.io/fastembed/examples/Supported_Models/) text model |
 
 The client side lives in `~/.hippocampus/client.json`, which is written by
 the installer. There you can map local project folders to server projects,
-add extra memory folders, or turn off automatic extraction.
+add extra memory folders, or turn off automatic extraction. Install with
+`--lang pt` to get the recall header and the automatically extracted
+memories in Portuguese. The web UI follows your browser's language and has
+an EN/PT button to switch.
 
 ## Security
 
