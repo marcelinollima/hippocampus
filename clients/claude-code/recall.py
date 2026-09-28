@@ -46,6 +46,9 @@ def main():
     ctx = (data.get("context") or "").strip()
     if not ctx:
         return
+    # Claude Code reads hook output as UTF-8; on Windows a pipe defaults to the
+    # ANSI code page and every accent would arrive as "�"
+    sys.stdout.reconfigure(encoding="utf-8")
     print("<long-term-memory>")
     print(HEADER.get(cfg["lang"], HEADER["en"]))
     print(ctx)

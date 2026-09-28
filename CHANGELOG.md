@@ -15,6 +15,9 @@ Hippocampus now speaks English and Portuguese end to end, not only in the web UI
 - Claude Code installer `--lang`: recall header and extracted memories in that language.
 - Web UI: EN/PT button; the choice is remembered in the browser.
 
+### Fixed
+- Recall hook on Windows: output is UTF-8, so accents no longer arrive as "�".
+
 ### Unchanged on purpose
 - Tool names, statuses, types and API fields are the same in every language.
 
