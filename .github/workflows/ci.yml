@@ -58,3 +58,34 @@ jobs:
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz | tar -xz gitleaks
           ./gitleaks git --redact --verbose .
+
+  local-install:
+    # the "new user on their own computer" path, end to end
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest]
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - run: pip install .
+      - run: hippocampus init
+      - run: cp -r examples/memories/* ~/.hippocampus/data/memories/
+      - run: hippocampus autostart
+      - name: Server comes up on its own
+        run: |
+          for i in $(seq 1 90); do curl -fsS http://127.0.0.1:8765/health && exit 0; sleep 5; done
+          cat ~/.hippocampus/server.log; exit 1
+      - run: python clients/claude-code/install.py --url http://127.0.0.1:8765
+      - name: Recall hook returns memories
+        run: |
+          echo '{"prompt":"how do I restore one file from the nightly backup?"}' \
+            | python ~/.hippocampus/hooks/recall.py | tee out.txt
+          grep -q "backup-restic-nas" out.txt
+      - run: hippocampus autostart --remove

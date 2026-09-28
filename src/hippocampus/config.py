@@ -7,6 +7,12 @@ import os
 from dataclasses import dataclass, field
 from pathlib import Path
 
+# One folder per user for everything: the server's data and token, and the
+# Claude Code client's config and hooks. A fixed place (not the current
+# directory) is what lets the server start on its own at login.
+HOME = Path.home() / ".hippocampus"
+DEFAULT_TOKEN_FILE = HOME / "server-token"
+
 DEFAULT_MODEL = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
 
 DEFAULT_INSTRUCTIONS = """\
@@ -44,6 +50,7 @@ class Config:
     db_path: Path
     web_dir: Path
     token: str
+    token_file: Path
     model: str
     owner: str
     instructions: str
@@ -55,11 +62,11 @@ class Config:
 
     @classmethod
     def from_env(cls):
-        data = Path(_env("DATA_DIR", str(Path.cwd() / "data"))).expanduser()
+        data = Path(_env("DATA_DIR", str(HOME / "data"))).expanduser()
         memory_dir = Path(_env("MEMORY_DIR", str(data / "memories"))).expanduser()
         token = _env("TOKEN")
-        token_file = _env("TOKEN_FILE")
-        if not token and token_file and Path(token_file).exists():
+        token_file = _env("TOKEN_FILE", str(DEFAULT_TOKEN_FILE))
+        if not token and Path(token_file).exists():
             token = Path(token_file).read_text(encoding="utf-8").strip()
 
         port = int(_env("PORT", "8765"))
@@ -83,6 +90,7 @@ class Config:
             db_path=Path(_env("DB_PATH", str(data / "hippocampus.db"))).expanduser(),
             web_dir=Path(__file__).parent / "web",
             token=token,
+            token_file=Path(token_file).expanduser(),
             model=_env("MODEL", DEFAULT_MODEL),
             owner=owner,
             instructions=instructions,

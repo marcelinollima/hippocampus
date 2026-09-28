@@ -26,8 +26,8 @@ novo, e ele volta a tentar caminhos que já falharam.
 
 ## O que o Hippocampus faz
 
-Ele leva essas memórias para **um servidorzinho seu** e liga isso no Claude
-Code. Assim, toda sessão:
+Ele leva essas memórias para **um servidor de memória seu**, no seu próprio
+computador ou numa VPS pequena, e liga isso no Claude Code. Assim, toda sessão:
 
 - **lembra sozinha.** Um hook busca na memória a cada mensagem e injeta as
   poucas notas que importam antes de o Claude começar a trabalhar.
@@ -90,10 +90,40 @@ navegador está em português.
 
 ## Começando
 
-### 1. Suba o servidor
+### 1. Escolha onde ele roda
 
-Você precisa de uma máquina com um domínio público. Uma VPS de 1 GB de RAM com
-2 GB de swap já basta.
+| | **No seu computador** | **Num servidor (VPS)** |
+|---|---|---|
+| Bom para | uma máquina só, experimentar | vários computadores, celular, claude.ai |
+| Você precisa de | Python 3.10+ | uma VPS pequena (1 GB de RAM + 2 GB de swap) e um domínio |
+| A memória fica acessível | só neste computador | em qualquer lugar onde você usa o Claude |
+| Instalação | ~5 minutos | ~15 minutos |
+
+Dá pra começar no computador e passar pra um servidor depois. As memórias são
+arquivos comuns, então basta copiar a pasta `memories`.
+
+### 2a. No seu computador
+
+```bash
+git clone https://github.com/marcelinollima/hippocampus && cd hippocampus
+pip install .
+hippocampus init        # cria ~/.hippocampus com a pasta de dados e um token
+hippocampus autostart   # liga o servidor agora e a cada login (sem terminal aberto)
+python clients/claude-code/install.py --url http://127.0.0.1:8765
+```
+
+Pronto: abra uma sessão nova do Claude Code. A interface web fica em
+<http://127.0.0.1:8765> e pede o token salvo em `~/.hippocampus/server-token`.
+Para carregar as memórias de exemplo, copie `examples/memories/*` para
+`~/.hippocampus/data/memories/`.
+
+O `autostart` usa a pasta Inicializar no Windows, um LaunchAgent no macOS e um
+serviço systemd de usuário no Linux. Nenhum deles precisa de administrador, e
+`hippocampus autostart --remove` desfaz. Se preferir Docker, use
+`docker compose -f docker-compose.local.yml up -d` (as instruções estão no
+começo do arquivo).
+
+### 2b. Num servidor
 
 ```bash
 git clone https://github.com/marcelinollima/hippocampus && cd hippocampus
@@ -102,19 +132,8 @@ mkdir -p data                # memórias + índice ficam aqui (faça backup)
 docker compose up -d         # Hippocampus + Caddy com HTTPS automático
 ```
 
-Sem Docker, veja [deploy/systemd](deploy/systemd/hippocampus.service). Para
-testar localmente antes:
-
-```bash
-pip install git+https://github.com/marcelinollima/hippocampus
-export HIPPOCAMPUS_TOKEN=$(hippocampus token)
-mkdir -p data && cp -r examples/memories data/
-hippocampus serve            # http://127.0.0.1:8765
-```
-
-### 2. Conecte o Claude Code
-
-Em cada máquina onde você usa o Claude Code:
+Sem Docker, veja [deploy/systemd](deploy/systemd/hippocampus.service). Depois,
+em cada máquina onde você usa o Claude Code:
 
 ```bash
 python clients/claude-code/install.py --url https://memoria.exemplo.com.br --token <TOKEN>
@@ -201,6 +220,8 @@ commit da pasta `data/`.
 ## Linha de comando
 
 ```
+hippocampus init                  # prepara uma instalação local (~/.hippocampus + token)
+hippocampus autostart [--remove]  # liga o servidor a cada login (Windows, macOS, Linux)
 hippocampus serve                 # MCP + API + web (sincroniza ao subir)
 hippocampus sync [--full]         # indexa o que é novo/mudou, ou reconstrói tudo
 hippocampus suggest-links         # calcula as ligações "parecidas" da constelação

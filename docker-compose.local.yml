@@ -1,0 +1,15 @@
+# Hippocampus on your own machine, without a domain or HTTPS.
+#   echo "HIPPOCAMPUS_TOKEN=$(python -c 'import secrets; print(secrets.token_urlsafe(32))')" > .env
+#   mkdir -p data
+#   docker compose -f docker-compose.local.yml up -d
+# It starts again with Docker (restart: unless-stopped). Only this machine can
+# reach it: the port is published on 127.0.0.1, not on your network.
+services:
+  hippocampus:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8765:8765"
+    volumes:
+      - ./data:/data

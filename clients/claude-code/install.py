@@ -2,6 +2,7 @@
 """Connect Claude Code to a Hippocampus server.
 
     python install.py --url https://memory.example.com --token <TOKEN>
+    python install.py --url http://127.0.0.1:8765     # local: token read from ~/.hippocampus
 
 What it does (idempotent, safe to re-run):
   1. writes ~/.hippocampus/client.json and copies the hooks to ~/.hippocampus/hooks
@@ -131,7 +132,8 @@ def uninstall(a):
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawTextHelpFormatter)
     ap.add_argument("--url", help="server base URL, e.g. https://memory.example.com")
-    ap.add_argument("--token", help="access token (HIPPOCAMPUS_TOKEN on the server)")
+    ap.add_argument("--token", help="access token (HIPPOCAMPUS_TOKEN on the server); "
+                                    "default: ~/.hippocampus/server-token (hippocampus init)")
     ap.add_argument("--name", default="hippocampus", help="MCP server name (default: hippocampus)")
     ap.add_argument("--owner", help="your name, used in the extraction prompt")
     ap.add_argument("--no-extract", action="store_true",
@@ -140,8 +142,10 @@ def main():
     a = ap.parse_args()
     if a.uninstall:
         return uninstall(a)
+    if not a.token and (HOME / "server-token").exists():
+        a.token = (HOME / "server-token").read_text(encoding="utf-8").strip()
     if not a.url or not a.token:
-        ap.error("--url and --token are required")
+        ap.error("--url and --token are required (or run `hippocampus init` for a local server)")
     install(a)
 
 

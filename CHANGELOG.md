@@ -4,6 +4,24 @@ All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/) and the project uses
 [Semantic Versioning](https://semver.org/).
 
+## [0.2.0] - 2026-09-28
+
+Running on your own computer is now a first-class option, not just a trial.
+
+### Added
+- `hippocampus init`: creates `~/.hippocampus` with a data folder and a random token.
+- `hippocampus autostart [--remove]`: starts the server now and at every login, with
+  no admin rights (Windows Startup folder, macOS LaunchAgent, systemd user unit).
+- `hippocampus serve --log-file`, used by autostart since there is no terminal.
+- `docker-compose.local.yml`: Docker on your own machine, without Caddy or a domain.
+- The Claude Code installer reads the local token when `--token` is omitted.
+- CI runs the whole local install on Windows and macOS.
+
+### Changed
+- Default data folder is `~/.hippocampus/data` instead of `./data`, and the token
+  is read from `~/.hippocampus/server-token` when `HIPPOCAMPUS_TOKEN` is not set.
+  Installs that set `HIPPOCAMPUS_DATA_DIR` (Docker, systemd) are not affected.
+
 ## [0.1.1] - 2026-09-28
 
 Fixes found while migrating a real 361-memory installation.
