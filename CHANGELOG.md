@@ -6,6 +6,8 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-09-29
+
 Hippocampus now speaks English and Portuguese end to end, not only in the web UI.
 
 ### Added
@@ -17,6 +19,11 @@ Hippocampus now speaks English and Portuguese end to end, not only in the web UI
 
 ### Fixed
 - Recall hook on Windows: output is UTF-8, so accents no longer arrive as "�".
+
+### Documentation
+- README: a real example of the context block Claude receives, a comparison with
+  vector-only memory, screenshots of search results and of a memory's links, and a
+  list of known limitations.
 
 ### Unchanged on purpose
 - Tool names, statuses, types and API fields are the same in every language.

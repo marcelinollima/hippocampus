@@ -2,10 +2,11 @@
 
 # Hippocampus
 
-**Memória de longo prazo, no seu próprio servidor, para o Claude Code.**
-Uma memória só, compartilhada por todas as sessões, todos os projetos e todas as máquinas.
+**Memória persistente de longo prazo, no seu próprio servidor, para o Claude Code e outros clientes MCP.**
+Um servidor de memória só, compartilhado por todas as sessões, todos os projetos e todas as máquinas.
 
 [![CI](https://github.com/marcelinollima/hippocampus/actions/workflows/ci.yml/badge.svg)](https://github.com/marcelinollima/hippocampus/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/marcelinollima/hippocampus)](https://github.com/marcelinollima/hippocampus/releases)
 [![Licença: MIT](https://img.shields.io/badge/licen%C3%A7a-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP](https://img.shields.io/badge/MCP-streamable%20HTTP-8A2BE2)
@@ -16,7 +17,16 @@ Uma memória só, compartilhada por todas as sessões, todos os projetos e todas
 
 ---
 
-## O problema
+O Hippocampus é um **servidor de memória MCP** que você mesmo roda. Ele guarda
+as memórias como arquivos Markdown comuns, indexa tudo em SQLite e encontra o
+que importa com **busca híbrida: palavras-chave BM25 + embeddings vetoriais +
+um grafo de conhecimento** feito das ligações que você (ou o Claude) escreve
+entre as notas. Hooks do Claude Code trazem as memórias certas a cada mensagem
+e organizam a memória no fim de cada sessão.
+
+![A interface web em constelação: cada memória é uma estrela, as ligações escritas são linhas, e a busca acende o que encontrou](docs/img/constellation.jpg)
+
+## Por que o Hippocampus?
 
 O Claude Code guarda memória **por pasta de projeto**. Abriu a sessão em outra
 pasta, ou em outra máquina, e tudo que ele aprendeu no outro lugar some: qual
@@ -24,9 +34,7 @@ servidor roda o quê, como acessar o banco de produção sem ser bloqueado, o qu
 já foi resolvido semana passada. Você acaba explicando as mesmas coisas de
 novo, e ele volta a tentar caminhos que já falharam.
 
-## O que o Hippocampus faz
-
-Ele leva essas memórias para **um servidor de memória seu**, no seu próprio
+O Hippocampus leva essas memórias para **um servidor de memória seu**, no seu próprio
 computador ou numa VPS pequena, e liga isso no Claude Code. Assim, toda sessão:
 
 - **lembra sozinha.** Um hook busca na memória a cada mensagem e injeta as
@@ -46,7 +54,40 @@ As memórias são **arquivos Markdown comuns**. O banco é só um índice, que d
 pra apagar e reconstruir quando quiser. Os embeddings rodam **localmente**
 (ONNX): não precisa de chave de API e suas notas não vão para terceiros.
 
-![A interface web em constelação: cada memória é uma estrela, as ligações escritas são linhas, e a busca acende o que encontrou](docs/img/constellation.jpg)
+## Exemplo: o que o Claude recebe
+
+O Claude chama `search_memory("restic backup on nas-1 is failing, disk full?")`
+e recebe isto de volta (saída real das [memórias de exemplo](examples/memories),
+que estão em inglês, resumida):
+
+```text
+# Relevant memories for: restic backup on nas-1 is failing, disk full?
+
+## backup-restic-nas  (reference | project infra | 2026-01-20 | via meaning+name+text)
+_Nightly restic backups to nas-1: schedule, retention, and how to restore a single file._
+...
+Disk usage history: [[nas-disk-full-march]].
+
+## nas-disk-full-march  (project | project infra | 2026-03-20 | RESOLVED on 2026-03-21 | via graph neighbour)
+_nas-1 hit 98% disk in March: old restic snapshots were never pruned. Fixed by adding prune to the timer._
+...
+
+> Old facts may be stale: check the date before acting on them.
+```
+
+A primeira nota foi achada por palavra-chave **e** por sentido. A segunda veio
+pela ligação `[[nas-disk-full-march]]` escrita na primeira, e chega marcada
+como incidente resolvido, então o Claude a trata como histórico, não como o
+estado atual. O hook de busca automática injeta o mesmo tipo de bloco a cada
+mensagem, numa versão mais leve (menos resultados, sem expansão por ligações),
+porque ele é pago em toda mensagem. Com `HIPPOCAMPUS_LANG=pt` o cabeçalho sai
+em português.
+
+Outras coisas que você pode dizer em qualquer sessão, em qualquer máquina:
+
+- *"O que ainda está pendente na API da loja?"* → `list_pending`
+- *"Salva na memória como a gente corrigiu o relatório de pedidos."* → `save_memory`
+- *"O problema do disco foi resolvido, marca como resolvido."* → `mark_memory`
 
 ## Como funciona
 
@@ -83,6 +124,28 @@ Os dois primeiros são combinados com Reciprocal Rank Fusion. Memórias
 resolvidas ou substituídas perdem prioridade, mas continuam aparecendo na
 busca. O porquê de cada escolha está em [docs/design.md](docs/design.md) (em
 inglês).
+
+### O que muda em relação a uma memória só com banco vetorial
+
+Uma memória que só "gera o embedding de cada nota e devolve os vetores mais
+próximos" deixa escapar coisas que importam para um agente trabalhando em
+sistemas reais:
+
+| | só vetores | Hippocampus |
+|---|---|---|
+| Termos exatos (`5432`, `--force`, um hostname) | costumam se perder no embedding | o BM25 (FTS5) ranqueia direto |
+| Notas longas | um vetor por nota mistura os assuntos | um vetor por seção `##` |
+| "Isto depende daquilo" | não sai da semelhança | ligações `[[...]]` escritas à mão expandem um salto |
+| Fatos antigos | voltam como se ainda valessem | `resolved` / `superseded` perdem prioridade e vêm com data |
+| Trabalho em aberto | não existe | status `pending` e `list_pending` |
+| Armazenamento | banco opaco | arquivos Markdown; o índice se reconstrói com `hippocampus sync --full` |
+| Embeddings | muitas vezes uma API externa | modelo ONNX local, sem chave de API |
+
+## Telas
+
+| Resultados da busca, com o sinal que achou cada um | Uma memória com as ligações de entrada e saída |
+|---|---|
+| ![Resultados da busca na interface web, cada um mostrando se casou por sentido, nome ou texto, e o status](docs/img/search.jpg) | ![Uma memória aberta na interface web, com as memórias que ela cita e as que citam ela](docs/img/memory.jpg) |
 
 A interface web mostra a memória inteira como uma **constelação**, onde dá pra
 buscar, abrir, editar e filtrar por projeto. Ela abre em português quando o
@@ -144,13 +207,20 @@ Antes de mexer, ele faz backup do `~/.claude/settings.json`, e `--uninstall`
 desfaz tudo. As pastas de memória que o Claude Code já tem
 (`~/.claude/projects/*/memory`) sobem no próximo sync.
 
+Para usar a mesma memória no claude.ai (web, desktop e celular), veja
+[docs/claude-ai.md](docs/claude-ai.md).
+
 ### 3. Use
 
 Nada muda no seu jeito de trabalhar. Pergunte ao Claude algo da sua
 infraestrutura e repare no bloco `<long-term-memory>` que ele recebeu. Para
 ensinar algo, diga *"salva isso na memória"*.
 
-## Ferramentas MCP
+## Ferramentas de memória MCP
+
+O servidor fala MCP por streamable HTTP, então qualquer cliente MCP que
+suporte esse transporte pode usar estas ferramentas. Os hooks de busca
+automática, sync e organização são específicos do Claude Code.
 
 | ferramenta | o que faz |
 |---|---|
@@ -236,11 +306,25 @@ hippocampus token                 # gera um token aleatório
 ## Estado do projeto
 
 O Hippocampus nasceu do trabalho diário do autor, onde guarda mais de 360
-memórias em 9 projetos. É um projeto novo (v0.1), então espere arestas e, por
-favor, reporte o que achar. Ideias e problemas vão nas
+memórias em 9 projetos. É um projeto novo (0.x), então espere arestas e, por
+favor, reporte o que achar. O CI roda os testes em Linux e Windows, um teste
+do Docker, uma varredura de segredos e a instalação local completa em Windows
+e macOS.
+
+Limitações conhecidas:
+
+- um token por servidor: é uma memória pessoal, não multiusuário;
+- os hooks de busca automática e organização existem só para o Claude Code;
+  outros clientes MCP recebem as ferramentas, mas precisam chamá-las por conta
+  própria;
+- a expansão por ligações é de um salto, só pelas ligações escritas à mão (de
+  propósito, veja [docs/design.md](docs/design.md)).
+
+Ideias e problemas vão nas
 [issues](https://github.com/marcelinollima/hippocampus/issues). Contribuições
 são bem-vindas, e issues em português também. Veja o
-[CONTRIBUTING.md](CONTRIBUTING.md).
+[CONTRIBUTING.md](CONTRIBUTING.md). As mudanças estão no
+[CHANGELOG](CHANGELOG.md).
 
 ## Licença
 

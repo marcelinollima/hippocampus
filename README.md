@@ -2,10 +2,11 @@
 
 # Hippocampus
 
-**Self-hosted long-term memory for Claude Code.**
-One memory shared by every session, every project and every machine.
+**Self-hosted, persistent long-term memory for Claude Code and other MCP clients.**
+One memory server shared by every session, every project and every machine.
 
 [![CI](https://github.com/marcelinollima/hippocampus/actions/workflows/ci.yml/badge.svg)](https://github.com/marcelinollima/hippocampus/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/marcelinollima/hippocampus)](https://github.com/marcelinollima/hippocampus/releases)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![MCP](https://img.shields.io/badge/MCP-streamable%20HTTP-8A2BE2)
@@ -16,7 +17,15 @@ English · [Português](README.pt-BR.md)
 
 ---
 
-## The problem
+Hippocampus is an **MCP memory server** you run yourself. It stores memories
+as plain Markdown files, indexes them in SQLite, and finds them with **hybrid
+search: BM25 keywords + vector embeddings + a knowledge graph** of links that
+you (or Claude) write between notes. Claude Code hooks recall relevant
+memories on every prompt and curate the memory at the end of each session.
+
+![The constellation web UI: every memory is a star, written links are lines, and a search lights up the matches](docs/img/constellation.jpg)
+
+## Why Hippocampus?
 
 Claude Code keeps memory **per project folder**. Open a session in another
 folder, or on another machine, and everything learned elsewhere is gone:
@@ -24,10 +33,8 @@ which server runs what, how to reach the production database without being
 blocked, what was already fixed last week. You end up explaining the same
 things over and over, and Claude keeps retrying approaches that already failed.
 
-## What Hippocampus does
-
-It moves those memories to **one memory server you own**, on your own computer
-or on a small VPS, and wires it into Claude Code, so that every session:
+Hippocampus moves those memories to **one memory server you own**, on your own
+computer or on a small VPS, and wires it into Claude Code, so that every session:
 
 - **recalls automatically.** A hook searches memory on every prompt and
   injects the few notes that matter, before Claude starts working.
@@ -43,7 +50,39 @@ Memories are **plain Markdown files**. The database is only an index you can
 delete and rebuild at any time. Embeddings run **locally** (ONNX): no API key
 is needed and your notes never go to a third party.
 
-![The constellation web UI: every memory is a star, written links are lines, and a search lights up the matches](docs/img/constellation.jpg)
+## Example: what Claude receives
+
+Claude calls `search_memory("restic backup on nas-1 is failing, disk full?")`
+and gets this back (real output from the [sample memories](examples/memories),
+trimmed):
+
+```text
+# Relevant memories for: restic backup on nas-1 is failing, disk full?
+
+## backup-restic-nas  (reference | project infra | 2026-01-20 | via meaning+name+text)
+_Nightly restic backups to nas-1: schedule, retention, and how to restore a single file._
+...
+Disk usage history: [[nas-disk-full-march]].
+
+## nas-disk-full-march  (project | project infra | 2026-03-20 | RESOLVED on 2026-03-21 | via graph neighbour)
+_nas-1 hit 98% disk in March: old restic snapshots were never pruned. Fixed by adding prune to the timer._
+...
+
+> Old facts may be stale: check the date before acting on them.
+```
+
+The first note was found by keywords **and** meaning. The second came in
+through the `[[nas-disk-full-march]]` link written in the first one, and it is
+labelled as a resolved incident, so Claude treats it as history, not as the
+current state. The recall hook injects the same kind of block on every prompt,
+in a lighter form (fewer results, no link expansion) because it is paid on
+every message.
+
+Other things you can say in any session, on any machine:
+
+- *"What's still pending on the shop API?"* → `list_pending`
+- *"Save to memory how we fixed the orders report."* → `save_memory`
+- *"The disk issue is fixed, mark it resolved."* → `mark_memory`
 
 ## How it works
 
@@ -78,6 +117,27 @@ A search mixes three signals:
 The first two are fused with Reciprocal Rank Fusion. Resolved and superseded
 memories are demoted but still findable. The reasoning behind each choice is in
 [docs/design.md](docs/design.md).
+
+### How this differs from a vector-database memory
+
+A memory that is only "embed every note, return the nearest vectors" misses
+several things that matter for an agent working on real systems:
+
+| | vectors only | Hippocampus |
+|---|---|---|
+| Exact tokens (`5432`, `--force`, a hostname) | often lost in the embedding | BM25 (FTS5) ranks them directly |
+| Long notes | one vector per note blurs its topics | one vector per `##` section |
+| "This depends on that" | cannot be inferred from similarity | hand-written `[[links]]` expand results one hop |
+| Outdated facts | returned as if still true | `resolved` / `superseded` demoted and labelled with a date |
+| Open work | not modelled | `pending` status and `list_pending` |
+| Storage | opaque database | Markdown files; the index can be rebuilt with `hippocampus sync --full` |
+| Embeddings | often a hosted API | local ONNX model, no API key |
+
+## Screenshots
+
+| Search results with the signals behind each hit | A memory with its links in and out |
+|---|---|
+| ![Search results in the web UI, each one showing whether it matched by meaning, name or text, and its status](docs/img/search.jpg) | ![A memory opened in the web UI, with the memories it links to and the ones that link to it](docs/img/memory.jpg) |
 
 The web UI shows the whole memory as a **constellation**, which you can search,
 open, edit and filter by project.
@@ -138,13 +198,20 @@ backs up `~/.claude/settings.json` first, and `--uninstall` reverses
 everything. Your existing Claude Code memory folders
 (`~/.claude/projects/*/memory`) are uploaded on the next sync.
 
+To use the same memory from claude.ai (web, desktop and mobile), see
+[docs/claude-ai.md](docs/claude-ai.md).
+
 ### 3. Use it
 
 Nothing changes in how you work. Ask Claude something about your
 infrastructure and look for the `<long-term-memory>` block it received. To
 teach it something, say *"save this to memory"*.
 
-## MCP tools
+## MCP memory tools
+
+The server speaks MCP over streamable HTTP, so any MCP client that supports it
+can use these tools. The automatic recall, sync and curation hooks are
+specific to Claude Code.
 
 | tool | what it does |
 |---|---|
@@ -225,13 +292,25 @@ hippocampus stats                 # counts, broken links, pending items
 hippocampus token                 # generate a random token
 ```
 
-## Status and roadmap
+## Project status
 
 Hippocampus came out of its author's daily work, where it holds 360+
-memories across 9 projects. It is young (v0.1): expect rough edges and please
-report them. Ideas for next steps:
-[open issues](https://github.com/marcelinollima/hippocampus/issues).
-Contributions are welcome. See [CONTRIBUTING.md](CONTRIBUTING.md).
+memories across 9 projects. It is young (0.x): expect rough edges and please
+report them. CI runs the tests on Linux and Windows, a Docker smoke test, a
+secret scan, and the full local install on Windows and macOS.
+
+Known limitations:
+
+- one token per server: it is a personal memory, not a multi-user one;
+- automatic recall and curation hooks exist for Claude Code only; other MCP
+  clients get the tools but must call them themselves;
+- link expansion is one hop, over hand-written links only (by design, see
+  [docs/design.md](docs/design.md)).
+
+Bug reports and ideas are welcome in the
+[issues](https://github.com/marcelinollima/hippocampus/issues), and
+contributions in English or Portuguese. See [CONTRIBUTING.md](CONTRIBUTING.md).
+Changes are listed in the [CHANGELOG](CHANGELOG.md).
 
 ## License
 
