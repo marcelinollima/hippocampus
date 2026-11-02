@@ -226,9 +226,9 @@ automática, sync e organização são específicos do Claude Code.
 |---|---|
 | `search_memory(query, limit)` | busca híbrida; devolve um bloco de contexto pronto |
 | `read_memory(name)` | a memória inteira, com quem ela cita, quem cita ela e as parecidas |
-| `save_memory(name, description, body, type, project, status)` | cria ou atualiza |
-| `mark_memory(name, status, note)` | muda o status e anexa uma nota com data |
-| `list_pending(project)` | o que ainda está aberto |
+| `save_memory(name, description, body, type, project, status)` | cria ou atualiza; aponta pendências parecidas |
+| `mark_memory(name, status, note)` | muda o status e anexa uma nota com data; mesmo aviso |
+| `list_pending(project, limit, offset)` | o que ainda está aberto, das mais antigas para as mais novas, paginado |
 | `list_memories(project)` | navega por projeto |
 
 ## Formato da memória

@@ -58,6 +58,26 @@ vector half of the search.
 "did we ever see this error?", so it must stay findable. The output labels it
 (`RESOLVED on 2026-03-21`) so the model knows it is history.
 
+### Saving points to pending items that look alike
+
+A status only changes when someone calls `mark_memory` on that memory. In
+real use the fix was often written somewhere else (a new memory, a paragraph
+added to another one), and the pending item stayed open: after two months
+there were 400+ of them, many already done. Saving is the one moment the
+model knows what was just finished, so `save_memory` and `mark_memory` return
+up to 3 pending memories that look like the saved one, with a hint. The model
+decides; nothing is closed automatically.
+
+The score is the best centered cosine between any chunk of the saved memory
+and any chunk of the pending one (centered for the same reason as suggested
+links, below). The threshold, 0.50, came from the production index: notes
+about a real pending item scored 0.53-0.58 against it, an unrelated note's
+best match was 0.41. On a smaller index the whole scale sat higher, so a
+different corpus may want a different value.
+
+`list_pending` is paged and oldest first for the same reason: with 400 items
+it returned over 100k characters and clients refused the answer.
+
 ## The recall hook must be cheap and must never fail loudly
 
 It runs on **every** prompt, so:

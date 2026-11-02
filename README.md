@@ -217,9 +217,9 @@ specific to Claude Code.
 |---|---|
 | `search_memory(query, limit)` | hybrid search; returns a context block ready to use |
 | `read_memory(name)` | the full memory, with its links in and out and similar memories |
-| `save_memory(name, description, body, type, project, status)` | create or update |
-| `mark_memory(name, status, note)` | change the status and append a dated note |
-| `list_pending(project)` | what is still open |
+| `save_memory(name, description, body, type, project, status)` | create or update; points to pending items that look alike |
+| `mark_memory(name, status, note)` | change the status and append a dated note; same hint |
+| `list_pending(project, limit, offset)` | what is still open, oldest first, paged |
 | `list_memories(project)` | browse by project |
 
 ## Memory format
