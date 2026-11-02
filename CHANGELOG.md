@@ -6,8 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-11-02
+
 Pending items no longer stay open forever just because the fix was written
-somewhere else.
+somewhere else. On the author's server, the first review of the backlog
+closed 11 of 417 pending items, each with the sentence that proved it.
 
 ### Added
 - `save_memory` and `mark_memory` answer with `related_pending`: up to 3 open
