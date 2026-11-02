@@ -474,6 +474,59 @@ class Store:
         top = sorted(best.values(), key=lambda x: -x[1])[:limit]
         return [dict(d, similarity=round(s, 2)) for d, s in top]
 
+    def review_candidates(self, project="", per_item=3, body_chars=6000, excerpt=1200):
+        """Each pending memory with the evidence a reviewer needs to judge it:
+        its own body (later notes included) and the memories written AFTER it
+        was opened that look like it, with the chunk that matched.
+
+        The judging itself needs a language model, which the server does not
+        have; clients run it (see clients/claude-code/review.py)."""
+        c = self.connect()
+        mems = {r["id"]: dict(r) for r in c.execute(
+            "SELECT id, name, project, description, modified, status, status_at, body "
+            "FROM memories")}
+        chunks = c.execute("SELECT id, memory_id, text FROM chunks").fetchall()
+        c.close()
+        pend = [m for m in mems.values()
+                if m["status"] == "pending" and project.lower() in (m["project"] or "").lower()]
+        ids, mat = self.vectors["ids"], self.vectors["m"]
+        if not pend or mat is None or not len(ids):
+            return []
+        row = {int(cid): i for i, cid in enumerate(ids)}
+        known = [ch for ch in chunks if ch["id"] in row]
+        M = mat[[row[ch["id"]] for ch in known]] - mat.mean(axis=0)
+        M /= np.linalg.norm(M, axis=1, keepdims=True) + 1e-9
+        owner = np.array([ch["memory_id"] for ch in known])
+        day = {mid: (m["modified"] or "")[:10] for mid, m in mems.items()}
+        out = []
+        for p in sorted(pend, key=lambda m: (m["status_at"] or m["modified"] or "")):
+            since = (p["status_at"] or p["modified"] or "")[:10]
+            mine = owner == p["id"]
+            if not mine.any():
+                continue
+            S = (M[~mine] @ M[mine].T).max(axis=1)
+            others = np.flatnonzero(~mine)
+            best = {}
+            for j in np.argsort(-S):
+                if S[j] < RELATED_THRESHOLD or len(best) >= per_item:
+                    break
+                mid = int(owner[others[j]])
+                # evidence has to be newer than the item it would close
+                if mid in best or day[mid] <= since:
+                    continue
+                best[mid] = (float(S[j]), known[others[j]]["text"])
+            body = p["body"] or ""
+            if len(body) > body_chars:  # top keeps the context, the end keeps the newest notes
+                body = body[:body_chars * 2 // 5] + "\n[...]\n" + body[-body_chars * 3 // 5:]
+            out.append({
+                "name": p["name"], "project": p["project"], "description": p["description"],
+                "since": since, "last_note": last_note(p["body"]), "body": body,
+                "evidence": [{"name": mems[mid]["name"], "project": mems[mid]["project"],
+                              "modified": day[mid], "status": mems[mid]["status"],
+                              "similarity": round(s, 2), "excerpt": t[:excerpt]}
+                             for mid, (s, t) in best.items()]})
+        return out
+
     def list(self, project=""):
         c = self.connect()
         if project:

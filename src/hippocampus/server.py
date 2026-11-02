@@ -154,6 +154,15 @@ def create_app(cfg, store=None, warmup=True):
         return JSONResponse(await bg(store.mark, d.get("name", ""), d.get("status", ""),
                                      d.get("note", "")))
 
+    @mcp.custom_route("/api/review", methods=["POST"])
+    async def r_review(req: Request):
+        """Pending memories with their candidate evidence, for a client-side reviewer."""
+        if not authorized(req):
+            return deny()
+        d = await req.json()
+        return JSONResponse({"items": await bg(store.review_candidates,
+                                               str(d.get("project", "")))})
+
     @mcp.custom_route("/api/import", methods=["POST"])
     async def r_import(req: Request):
         """Receive raw Markdown files from a client and index what changed.

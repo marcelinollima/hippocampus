@@ -24,7 +24,7 @@ HOME = Path.home() / ".hippocampus"
 HOOKS_DIR = HOME / "hooks"
 SETTINGS = Path.home() / ".claude" / "settings.json"
 MARK = "hippocampus"  # every command we add contains this, which makes removal exact
-FILES = ("_client.py", "recall.py", "sync.py", "extract.py")
+FILES = ("_client.py", "recall.py", "sync.py", "extract.py", "review.py")
 
 
 def hook_cmd(script, *args):
