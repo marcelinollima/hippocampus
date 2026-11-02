@@ -6,6 +6,18 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Added
+- Daily review on the server: `review.py --auto` plus a systemd service and
+  timer (`deploy/systemd/hippocampus-review.*`) that judge with Claude Code
+  under your subscription. `HIPPOCAMPUS_REVIEW` = `off` (default) | `report` |
+  `apply`.
+- Verdicts are stored (`/api/review/record`), and `--changed` reviews only
+  items that changed or got newer evidence since their last review.
+- In `report` mode, `list_pending` shows "looks done" with the quote under the
+  item, until the memory changes.
+- The client reads `HIPPOCAMPUS_LANG` and `HIPPOCAMPUS_OWNER` from the
+  environment, so it can run on the server with the server's `.env`.
+
 ## [0.4.0] - 2026-11-02
 
 Pending items no longer stay open forever just because the fix was written

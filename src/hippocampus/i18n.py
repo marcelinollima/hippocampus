@@ -32,6 +32,8 @@ use list_pending.""",
         "pending_since": "open since {d}",
         "pending_note": "last note {d}",
         "pending_more": "More: list_pending(offset={n}).",
+        "pending_suggest": "-> the review of {d} says this looks done: \"{q}\". Confirm with "
+                           "the user, then mark_memory resolved.",
         "related_hint": "These pending memories look like what was just saved. If this "
                         "work finished one of them, call mark_memory on it with status "
                         "resolved; if it moved one forward, mark it pending with a note. "
@@ -70,6 +72,8 @@ pendente?", use list_pending. Escreva as memórias em português.""",
         "pending_since": "aberta em {d}",
         "pending_note": "última nota {d}",
         "pending_more": "Mais: list_pending(offset={n}).",
+        "pending_suggest": "-> a revisão de {d} diz que parece feita: \"{q}\". Confirme com "
+                           "o usuário e então mark_memory resolved.",
         "related_hint": "Estas memórias pendentes parecem com o que acabou de ser gravado. "
                         "Se este trabalho concluiu alguma, chame mark_memory nela com status "
                         "resolved; se só avançou, marque pending com uma nota. Se não têm "

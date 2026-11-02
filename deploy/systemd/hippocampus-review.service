@@ -1,0 +1,27 @@
+# Daily review of pending memories, on the server itself (see README, "Reviewing
+# pending items"). It judges with Claude Code (`claude -p`) under your Claude
+# subscription. Install, as the user that runs the server:
+#   curl -fsSL https://claude.ai/install.sh | bash          # Claude Code
+#   mkdir -p /opt/hippocampus/client && cp clients/claude-code/{_client,review}.py /opt/hippocampus/client/
+#   # on a machine with a browser: `claude setup-token`, then put the token in
+#   # /opt/hippocampus/review.env as CLAUDE_CODE_OAUTH_TOKEN=... (chmod 600)
+#   # set HIPPOCAMPUS_REVIEW=report (or apply) in /opt/hippocampus/.env
+#   sudo cp hippocampus-review.service hippocampus-review.timer /etc/systemd/system/
+#   sudo systemctl enable --now hippocampus-review.timer
+[Unit]
+Description=Hippocampus daily review of pending memories
+After=hippocampus.service
+Requires=hippocampus.service
+
+[Service]
+Type=oneshot
+User=hippocampus
+WorkingDirectory=/opt/hippocampus
+EnvironmentFile=/opt/hippocampus/.env
+EnvironmentFile=/opt/hippocampus/review.env
+Environment=HIPPOCAMPUS_URL=http://127.0.0.1:8765
+# Claude Code's native installer puts `claude` in ~/.local/bin
+Environment=PATH=/opt/hippocampus/.local/bin:/usr/local/bin:/usr/bin:/bin
+# one batch at a time: small servers share their memory with the embedding model
+ExecStart=/usr/bin/python3 /opt/hippocampus/client/review.py --auto --parallel 1
+TimeoutStartSec=2h

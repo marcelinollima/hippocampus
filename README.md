@@ -303,6 +303,14 @@ python ~/.hippocampus/hooks/review.py --apply ~/.hippocampus/review-<date>.json
 It only marks what the report lists as resolved **with a quote as proof**, and
 you can veto any item by setting `"apply": false` in the .json first.
 
+On a server, the review can run by itself once a day
+([deploy/systemd/hippocampus-review.service](deploy/systemd/hippocampus-review.service)),
+with Claude Code under your subscription. It only looks at items that changed
+or got newer evidence since their last review, and `HIPPOCAMPUS_REVIEW` says
+what to do with the result: `off` (default), `report` (list_pending shows
+"looks done" with the quote, for a person to confirm) or `apply` (marks them
+resolved; undo by marking them pending again).
+
 ## Project status
 
 Hippocampus came out of its author's daily work, where it holds 360+

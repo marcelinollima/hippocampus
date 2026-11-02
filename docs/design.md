@@ -96,6 +96,24 @@ contain anything) and answers JSON. Guard rails:
 On the author's 417 pending items the first pilot (16 oldest) found two that
 said "RESOLVED" in their own body, the case that started all this.
 
+### The daily review only looks at what moved
+
+Re-judging 400 items every day would repeat the same verdicts at the cost of
+about a million characters per run. Every verdict is stored in a `reviews`
+table (derived data, like the rest of the index: losing it only means one
+full review again), and `--changed` sends only items whose own file, or one
+of whose evidence memories, is newer than their last review. "Newer" is
+strict: timestamps have one-second resolution, and an edit in the same second
+as a review must not be skipped.
+
+It runs on the server through Claude Code (`claude -p` with a
+`CLAUDE_CODE_OAUTH_TOKEN` from `claude setup-token`), not through an API key:
+the people this is for already pay a subscription. `HIPPOCAMPUS_REVIEW`
+defaults to `off` so nobody's server starts spending on its own. In `report`
+mode a "looks done" verdict is shown in `list_pending` until the memory
+changes; in `apply` mode it is marked resolved with the note and quote, which
+a later `mark_memory ... pending` undoes.
+
 ## The recall hook must be cheap and must never fail loudly
 
 It runs on **every** prompt, so:

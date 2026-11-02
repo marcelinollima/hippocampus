@@ -9,8 +9,15 @@ on its own:
 
   python review.py                    # report -> ~/.hippocampus/review-<date>.md/.json
   python review.py --project shop     # only one project
+  python review.py --changed          # only items with news since their last review
   python review.py --apply FILE.json  # mark as resolved what the report says,
                                       # except items you set "apply": false
+  python review.py --auto             # for a daily timer: --changed, then do what
+                                      # HIPPOCAMPUS_REVIEW says (off | report | apply)
+
+Every verdict is stored on the server, so `--changed` skips what did not move.
+In `report` mode the "looks done" ones show up in list_pending with the quote;
+in `apply` mode they are marked resolved right away (undo: mark them pending).
 
 The model gets no tools at all: it only reads text and answers JSON.
 """
@@ -132,7 +139,10 @@ def report(results, path):
 
 
 def apply(cfg, path):
-    results = json.loads(open(path, encoding="utf-8").read())
+    return apply_results(cfg, json.loads(open(path, encoding="utf-8").read()))
+
+
+def apply_results(cfg, results):
     today = datetime.now().strftime("%Y-%m-%d")
     head, evidence = NOTE.get(cfg["lang"], NOTE["en"])
     done = 0
@@ -148,6 +158,10 @@ def apply(cfg, path):
               ("" if res.get("ok") else "  " + json.dumps(res, ensure_ascii=False)))
         done += bool(res.get("ok"))
     print("%d marked as resolved" % done)
+    return done
+
+
+MODES = ("off", "report", "apply")
 
 
 def main():
@@ -158,18 +172,34 @@ def main():
     ap.add_argument("--limit", type=int, default=0, help="review only the first N (oldest)")
     ap.add_argument("--model", help="model for claude -p (default: the extract model)")
     ap.add_argument("--apply", metavar="FILE.json", help="mark the approved items of a report")
+    ap.add_argument("--changed", action="store_true",
+                    help="only items that changed (or got newer evidence) since their last review")
+    ap.add_argument("--auto", action="store_true",
+                    help="daily mode: --changed, then follow HIPPOCAMPUS_REVIEW")
     a = ap.parse_args()
     cfg = _client.load()
     if not cfg["url"]:
         sys.exit("no server configured: run install.py first")
     if a.apply:
         return apply(cfg, a.apply)
+    mode = None
+    if a.auto:
+        mode = (os.environ.get("HIPPOCAMPUS_REVIEW") or cfg.get("review_mode") or "off").lower()
+        if mode not in MODES:
+            sys.exit("HIPPOCAMPUS_REVIEW must be one of: " + ", ".join(MODES))
+        if mode == "off":
+            print("HIPPOCAMPUS_REVIEW=off: nothing to do")
+            return
 
-    items = _client.post(cfg, "/api/review", {"project": a.project}, 300)["items"]
+    items = _client.post(cfg, "/api/review", {"project": a.project,
+                                              "changed_only": a.changed or a.auto}, 300)["items"]
     if a.limit:
         items = items[:a.limit]
     batches = [items[i:i + a.batch] for i in range(0, len(items), a.batch)]
     print("%d pending memories, %d batches" % (len(items), len(batches)), flush=True)
+    if not items:
+        _client.log("review", "nothing changed since the last review")
+        return
     results = []
     with ThreadPoolExecutor(max(1, a.parallel)) as ex:
         for n, part in enumerate(ex.map(lambda b: judge(cfg, b, a.model or cfg["extract"]["model"]),
@@ -183,6 +213,13 @@ def main():
     report(results, base.with_suffix(".md"))
     print("report:", base.with_suffix(".md"))
     print("data:  ", base.with_suffix(".json"), " (set \"apply\": false to skip an item)")
+    # answers the model could not give are not reviews: leave them for next time
+    seen = [r for r in results if r["reason"] != "no answer from model"]
+    _client.post(cfg, "/api/review/record", {"items": seen}, 60)
+    counts = {v: sum(r["verdict"] == v for r in results) for v in ("resolved", "unsure", "pending")}
+    marked = apply_results(cfg, results) if mode == "apply" else 0
+    _client.log("review", "%d reviewed (%s), mode %s, %d marked resolved" % (
+        len(results), ", ".join("%s %d" % kv for kv in counts.items()), mode or "manual", marked))
 
 
 if __name__ == "__main__":

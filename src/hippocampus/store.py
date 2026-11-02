@@ -46,6 +46,8 @@ CREATE TABLE IF NOT EXISTS chunks(id INTEGER PRIMARY KEY, memory_id INTEGER, tex
 CREATE INDEX IF NOT EXISTS ix_chunks_mem ON chunks(memory_id);
 CREATE TABLE IF NOT EXISTS vectors(chunk_id INTEGER PRIMARY KEY, v BLOB);
 CREATE TABLE IF NOT EXISTS suggestions(a TEXT, b TEXT, sim REAL);
+CREATE TABLE IF NOT EXISTS reviews(path TEXT PRIMARY KEY, reviewed_at TEXT, verdict TEXT,
+  reason TEXT, quote TEXT);
 CREATE INDEX IF NOT EXISTS ix_sug_a ON suggestions(a);
 CREATE INDEX IF NOT EXISTS ix_sug_b ON suggestions(b);
 """
@@ -424,8 +426,10 @@ class Store:
         """Pending memories, oldest first: the longer something sits open, the
         more likely it was finished somewhere and never marked."""
         c = self.connect()
-        rows = c.execute("SELECT name, project, description, modified, status_at, body "
-                         "FROM memories WHERE status='pending' AND project LIKE ?",
+        rows = c.execute("SELECT m.name, m.project, m.description, m.modified, m.status_at, "
+                         "m.body, r.reviewed_at, r.verdict, r.quote FROM memories m "
+                         "LEFT JOIN reviews r ON r.path = m.path "
+                         "WHERE m.status='pending' AND m.project LIKE ?",
                          ("%" + project + "%",)).fetchall()
         c.close()
         out = []
@@ -433,8 +437,32 @@ class Store:
             d = dict(r)
             d["last_note"] = last_note(d.pop("body"))
             d["since"] = (d["status_at"] or d["modified"] or "")[:10]
+            # a review suggestion counts only while the memory has not changed since
+            fresh = d["verdict"] == "resolved" and (d["reviewed_at"] or "") >= (d["modified"] or "")
+            d["suggest"] = {"on": d["reviewed_at"][:10], "quote": d["quote"] or ""} \
+                if fresh else None
+            for k in ("reviewed_at", "verdict", "quote"):
+                d.pop(k)
             out.append(d)
         return sorted(out, key=lambda d: (d["since"] or "9999", d["name"]))
+
+    def record_reviews(self, items):
+        """Remember each verdict, so the next daily run skips what did not change."""
+        now = now_iso()
+        c = self.connect()
+        n = 0
+        for it in items:
+            r = c.execute("SELECT path FROM memories WHERE name=? AND project=?",
+                          (slug(it.get("name", "")), it.get("project", ""))).fetchone()
+            if not r:
+                continue
+            c.execute("INSERT OR REPLACE INTO reviews VALUES(?,?,?,?,?)",
+                      (r["path"], now, it.get("verdict", ""), it.get("reason", ""),
+                       it.get("quote", "")))
+            n += 1
+        c.commit()
+        c.close()
+        return {"ok": True, "recorded": n}
 
     def related_pending(self, rec, limit=3, threshold=None):
         """Pending memories that look like `rec` (a memory just saved).
@@ -474,18 +502,25 @@ class Store:
         top = sorted(best.values(), key=lambda x: -x[1])[:limit]
         return [dict(d, similarity=round(s, 2)) for d, s in top]
 
-    def review_candidates(self, project="", per_item=3, body_chars=6000, excerpt=1200):
+    def review_candidates(self, project="", per_item=3, body_chars=6000, excerpt=1200,
+                          changed_only=False):
         """Each pending memory with the evidence a reviewer needs to judge it:
         its own body (later notes included) and the memories written AFTER it
         was opened that look like it, with the chunk that matched.
+
+        `changed_only` skips items already reviewed when neither the item nor
+        any of its evidence changed since: a daily run then costs a handful of
+        items instead of the whole backlog.
 
         The judging itself needs a language model, which the server does not
         have; clients run it (see clients/claude-code/review.py)."""
         c = self.connect()
         mems = {r["id"]: dict(r) for r in c.execute(
-            "SELECT id, name, project, description, modified, status, status_at, body "
+            "SELECT id, name, path, project, description, modified, status, status_at, body "
             "FROM memories")}
         chunks = c.execute("SELECT id, memory_id, text FROM chunks").fetchall()
+        reviewed = {r["path"]: r["reviewed_at"] for r in
+                    c.execute("SELECT path, reviewed_at FROM reviews")}
         c.close()
         pend = [m for m in mems.values()
                 if m["status"] == "pending" and project.lower() in (m["project"] or "").lower()]
@@ -515,6 +550,12 @@ class Store:
                 if mid in best or day[mid] <= since:
                     continue
                 best[mid] = (float(S[j]), known[others[j]]["text"])
+            last = reviewed.get(p["path"])
+            # strictly older: timestamps have 1 s resolution, and a change in the
+            # same second as the review must not be skipped
+            if changed_only and last and (p["modified"] or "") < last and \
+                    all((mems[mid]["modified"] or "") < last for mid in best):
+                continue
             body = p["body"] or ""
             if len(body) > body_chars:  # top keeps the context, the end keeps the newest notes
                 body = body[:body_chars * 2 // 5] + "\n[...]\n" + body[-body_chars * 3 // 5:]

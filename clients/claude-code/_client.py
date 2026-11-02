@@ -45,6 +45,10 @@ def load():
             cfg[k] = v
     cfg["url"] = os.environ.get("HIPPOCAMPUS_URL", cfg["url"]).rstrip("/")
     cfg["token"] = os.environ.get("HIPPOCAMPUS_TOKEN", cfg["token"])
+    # on the server itself (daily review) there is no client.json: the
+    # server's own .env gives the language and the owner's name
+    cfg["lang"] = os.environ.get("HIPPOCAMPUS_LANG", cfg["lang"])
+    cfg["owner"] = os.environ.get("HIPPOCAMPUS_OWNER", cfg["owner"])
     return cfg
 
 

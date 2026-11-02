@@ -315,6 +315,14 @@ python ~/.hippocampus/hooks/review.py --apply ~/.hippocampus/review-<data>.json
 Ele só marca o que o relatório dá como resolvido **com uma citação de prova**,
 e você pode vetar qualquer item pondo `"apply": false` no .json antes.
 
+Num servidor, a revisão pode rodar sozinha uma vez por dia
+([deploy/systemd/hippocampus-review.service](deploy/systemd/hippocampus-review.service)),
+com o Claude Code na sua assinatura. Ela só olha o que mudou ou ganhou
+evidência mais nova desde a última revisão, e `HIPPOCAMPUS_REVIEW` diz o que
+fazer com o resultado: `off` (padrão), `report` (o list_pending mostra "parece
+feita" com a citação, para alguém confirmar) ou `apply` (marca como resolvida;
+para desfazer, marque `pending` de novo).
+
 ## Estado do projeto
 
 O Hippocampus nasceu do trabalho diário do autor, onde guarda mais de 360

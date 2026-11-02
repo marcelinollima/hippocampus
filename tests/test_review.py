@@ -102,3 +102,71 @@ def test_apply_marks_only_approved(monkeypatch, tmp_path):
     review.apply(CFG, f)
     assert [c["name"] for c in calls] == ["a"]
     assert calls[0]["status"] == "resolved" and "it is done" in calls[0]["note"]
+
+
+def review_once(store, verdict="pending", quote=""):
+    store.record_reviews([{"name": "orders-report-mismatch", "project": "shop-api",
+                           "verdict": verdict, "reason": "r", "quote": quote}])
+    # the example files are dated 2026-03; a review "now" is newer than all of
+    # them, and anything saved later in the test is newer than the review
+    c = store.connect()
+    c.execute("UPDATE reviews SET reviewed_at='2026-06-01T00:00:00Z'")
+    c.commit()
+    c.close()
+
+
+def test_changed_only_skips_what_did_not_move(store, low_threshold):
+    assert len(store.review_candidates(changed_only=True)) == 1  # never reviewed
+    review_once(store)
+    assert store.review_candidates(changed_only=True) == []
+    assert len(store.review_candidates()) == 1  # a full run still sees it
+
+
+def test_newer_evidence_brings_it_back(store, low_threshold):
+    review_once(store)
+    store.save("finance-decision", "Finance decided the salesperson rule", FIX, project="shop-api")
+    (item,) = store.review_candidates(changed_only=True)
+    assert [e["name"] for e in item["evidence"]] == ["finance-decision"]
+
+
+def test_editing_the_item_brings_it_back(store):
+    review_once(store)
+    store.mark("orders-report-mismatch", "pending", "Finance meeting moved.")
+    assert len(store.review_candidates(changed_only=True)) == 1
+
+
+def test_suggestion_shows_until_the_memory_changes(store):
+    review_once(store, "resolved", "Finance chose who closed")
+    (p,) = store.pending()
+    assert p["suggest"]["quote"] == "Finance chose who closed"
+    store.mark("orders-report-mismatch", "pending", "Not yet, finance reopened it.")
+    assert store.pending()[0]["suggest"] is None
+
+
+def test_auto_off_does_nothing(monkeypatch, capsys):
+    monkeypatch.setenv("HIPPOCAMPUS_REVIEW", "off")
+    monkeypatch.setenv("HIPPOCAMPUS_URL", "http://x")
+    monkeypatch.setattr(sys, "argv", ["review.py", "--auto"])
+    monkeypatch.setattr(review._client, "post", lambda *a: pytest.fail("must not call the server"))
+    review.main()
+    assert "off" in capsys.readouterr().out
+
+
+def test_auto_apply_records_and_marks(monkeypatch, tmp_path):
+    monkeypatch.setenv("HIPPOCAMPUS_REVIEW", "apply")
+    monkeypatch.setenv("HIPPOCAMPUS_URL", "http://x")
+    monkeypatch.setattr(review._client, "HOME", tmp_path)
+    monkeypatch.setattr(sys, "argv", ["review.py", "--auto"])
+    calls = []
+
+    def post(cfg, route, payload, timeout):
+        calls.append((route, payload))
+        return {"items": [ITEM]} if route == "/api/review" else {"ok": True}
+    monkeypatch.setattr(review._client, "post", post)
+    monkeypatch.setattr(review, "judge", lambda cfg, batch, model: [dict(
+        name="a", project="p", since="", description="", verdict="resolved", reason="done",
+        source="self", quote="it is done", evidence=[], apply=True)])
+    review.main()
+    routes = [r for r, _ in calls]
+    assert routes == ["/api/review", "/api/review/record", "/api/mark"]
+    assert calls[0][1]["changed_only"] is True

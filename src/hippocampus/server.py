@@ -78,6 +78,10 @@ def create_app(cfg, store=None, warmup=True):
             desc = " ".join((r["description"] or "").split())
             out.append("- [%s] %s (%s): %s" % (r["project"], r["name"], dates,
                                                desc[:160] + ("..." if len(desc) > 160 else "")))
+            if r["suggest"]:
+                q = " ".join(r["suggest"]["quote"].split())
+                out.append("  " + say("pending_suggest", d=r["suggest"]["on"],
+                                      q=q[:200] + ("..." if len(q) > 200 else "")))
         if offset + len(page) < len(rows):
             out.append(say("pending_more", n=offset + len(page)))
         return "\n".join(out)
@@ -161,7 +165,16 @@ def create_app(cfg, store=None, warmup=True):
             return deny()
         d = await req.json()
         return JSONResponse({"items": await bg(store.review_candidates,
-                                               str(d.get("project", "")))})
+                                               str(d.get("project", "")),
+                                               changed_only=bool(d.get("changed_only")))})
+
+    @mcp.custom_route("/api/review/record", methods=["POST"])
+    async def r_review_record(req: Request):
+        """Store the reviewer's verdicts: {"items": [{name, project, verdict, reason, quote}]}"""
+        if not authorized(req):
+            return deny()
+        d = await req.json()
+        return JSONResponse(await bg(store.record_reviews, d.get("items", [])))
 
     @mcp.custom_route("/api/import", methods=["POST"])
     async def r_import(req: Request):

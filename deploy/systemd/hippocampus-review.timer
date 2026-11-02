@@ -1,0 +1,10 @@
+[Unit]
+Description=Run the Hippocampus pending review once a day
+
+[Timer]
+OnCalendar=*-*-* 04:30:00
+RandomizedDelaySec=20m
+Persistent=true
+
+[Install]
+WantedBy=timers.target
