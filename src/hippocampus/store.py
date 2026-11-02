@@ -22,11 +22,12 @@ TYPES = ("project", "reference", "feedback", "user")
 SKIP_FILES = {"MEMORY.md", "README.md"}
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 NOTE_RE = re.compile(r"^## Status \w+ on (\d{4}-\d{2}-\d{2})", re.M)
-# Centered cosine, best chunk against best chunk. Measured on 325 real
-# memories (multilingual MiniLM): random pairs have p50 0.12 and p99 0.51,
-# and 0.32% of them reach 0.60, about one false hint per save with 400 items
-# pending. 0.55 doubled that.
-RELATED_THRESHOLD = 0.60
+# Centered cosine, best chunk against best chunk (multilingual MiniLM).
+# On a 946-memory index, notes about a real pending item scored 0.53-0.58
+# against it, while an unrelated note's best match was 0.41. On a smaller
+# 325-memory index the scale was higher (random pairs p99 0.51): centering on
+# a bigger, more varied corpus pulls everything down.
+RELATED_THRESHOLD = 0.50
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS memories(

@@ -12,7 +12,7 @@ somewhere else.
 ### Added
 - `save_memory` and `mark_memory` answer with `related_pending`: up to 3 open
   items that look like what was just saved, with a hint to resolve them when the
-  work finished them. Threshold calibrated on real memories (centered cosine 0.60).
+  work finished them. Threshold calibrated on real memories (centered cosine 0.50).
 - The extraction hook acts on `related_pending`, with the same "only with
   evidence" rule.
 
