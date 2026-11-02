@@ -27,6 +27,8 @@ from datetime import datetime
 import _client
 
 LANGUAGES = {"en": "English", "pt": "Brazilian Portuguese"}
+NOTE = {"en": ("Pending review on %s: %s", "Evidence"),
+        "pt": ("Revisão de pendências em %s: %s", "Evidência")}
 
 PROMPT = """You review {owner}'s long-term memory. Below are memories marked
 PENDING (unfinished work). For each one decide whether the work it tracks is
@@ -132,13 +134,14 @@ def report(results, path):
 def apply(cfg, path):
     results = json.loads(open(path, encoding="utf-8").read())
     today = datetime.now().strftime("%Y-%m-%d")
+    head, evidence = NOTE.get(cfg["lang"], NOTE["en"])
     done = 0
     for r in results:
         if not r.get("apply"):
             continue
-        note = "Pending review on %s: %s" % (today, r["reason"])
+        note = head % (today, r["reason"])
         if r.get("quote"):
-            note += "\nEvidence (%s): \"%s\"" % (r.get("source") or "self", r["quote"])
+            note += "\n%s (%s): \"%s\"" % (evidence, r.get("source") or "self", r["quote"])
         res = _client.post(cfg, "/api/mark", {"name": r["name"], "status": "resolved",
                                               "note": note}, 60)
         print(("ok   " if res.get("ok") else "FAIL ") + r["name"] +
