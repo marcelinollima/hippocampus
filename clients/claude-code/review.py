@@ -207,6 +207,7 @@ def main():
             results += part
             print("batch %d/%d done" % (n, len(batches)), flush=True)
     stamp = datetime.now().strftime("%Y%m%d-%H%M")
+    _client.HOME.mkdir(exist_ok=True)  # absent on a server, where install.py never ran
     base = _client.HOME / ("review-" + stamp)
     base.with_suffix(".json").write_text(json.dumps(results, ensure_ascii=False, indent=1),
                                          encoding="utf-8")
