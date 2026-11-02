@@ -6,6 +6,22 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+Pending items no longer stay open forever just because the fix was written
+somewhere else.
+
+### Added
+- `save_memory` and `mark_memory` answer with `related_pending`: up to 3 open
+  items that look like what was just saved, with a hint to resolve them when the
+  work finished them. Threshold calibrated on real memories (centered cosine 0.60).
+- The extraction hook acts on `related_pending`, with the same "only with
+  evidence" rule.
+
+### Changed
+- `list_pending` is paged (`limit`, default 50, and `offset`), oldest first, with
+  the total, the date each item was opened and the date of its last note.
+  Descriptions are cut at 160 characters. With 400+ pending items the old
+  output passed 100k characters and clients refused it.
+
 ## [0.3.0] - 2026-09-29
 
 Hippocampus now speaks English and Portuguese end to end, not only in the web UI.

@@ -21,6 +21,12 @@ STATUS_ALIASES = {"ativa": "active", "pendente": "pending",
 TYPES = ("project", "reference", "feedback", "user")
 SKIP_FILES = {"MEMORY.md", "README.md"}
 LINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
+NOTE_RE = re.compile(r"^## Status \w+ on (\d{4}-\d{2}-\d{2})", re.M)
+# Centered cosine, best chunk against best chunk. Measured on 325 real
+# memories (multilingual MiniLM): random pairs have p50 0.12 and p99 0.51,
+# and 0.32% of them reach 0.60, about one false hint per save with 400 items
+# pending. 0.55 doubled that.
+RELATED_THRESHOLD = 0.60
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS memories(
@@ -87,6 +93,13 @@ def parse_md(text):
     if "status_em" in meta and "status_at" not in meta:
         meta["status_at"] = meta["status_em"]
     return meta, body
+
+
+def last_note(body):
+    """Date of the newest `## Status X on DATE` note that mark_memory appended.
+    `status_at` only moves when the status changes, so a pending item with
+    fresh progress notes still looked as old as the day it was opened."""
+    return max(NOTE_RE.findall(body or ""), default="")
 
 
 def render_md(rec):
@@ -337,8 +350,12 @@ class Store:
         c.commit()
         c.close()
         self.load_vectors()
-        return {"ok": True, "name": name, "path": rel, "chunks": len(rec["chunks"]),
-                "status": status}
+        out = {"ok": True, "name": name, "path": rel, "chunks": len(rec["chunks"]),
+               "status": status}
+        related = self.related_pending(rec)
+        if related:
+            out["related_pending"] = related
+        return out
 
     def import_file(self, rel, content):
         """Receive a raw Markdown file from a client (the sync hook) and index it."""
@@ -403,12 +420,58 @@ class Store:
         return out
 
     def pending(self, project=""):
+        """Pending memories, oldest first: the longer something sits open, the
+        more likely it was finished somewhere and never marked."""
         c = self.connect()
-        rows = c.execute("SELECT DISTINCT name, project, description, modified FROM memories "
-                         "WHERE status='pending' AND project LIKE ? "
-                         "ORDER BY project, modified DESC", ("%" + project + "%",)).fetchall()
+        rows = c.execute("SELECT name, project, description, modified, status_at, body "
+                         "FROM memories WHERE status='pending' AND project LIKE ?",
+                         ("%" + project + "%",)).fetchall()
         c.close()
-        return [dict(r) for r in rows]
+        out = []
+        for r in rows:
+            d = dict(r)
+            d["last_note"] = last_note(d.pop("body"))
+            d["since"] = (d["status_at"] or d["modified"] or "")[:10]
+            out.append(d)
+        return sorted(out, key=lambda d: (d["since"] or "9999", d["name"]))
+
+    def related_pending(self, rec, limit=3, threshold=None):
+        """Pending memories that look like `rec` (a memory just saved).
+
+        Status only changes when someone calls mark_memory, so a fix written
+        down in ANOTHER memory left the pending one open forever. Saving is
+        the moment the model knows what was done: show it the open items that
+        look alike and let it decide. Vectors are centered for the same
+        reason as in suggest_links (what every memory shares is noise), and
+        a memory scores its best chunk against the saved one's best chunk."""
+        threshold = RELATED_THRESHOLD if threshold is None else threshold
+        ids, m = self.vectors["ids"], self.vectors["m"]
+        if m is None or not len(ids) or not len(rec.get("vectors", [])):
+            return []
+        c = self.connect()
+        rows = c.execute("SELECT ch.id cid, mm.name, mm.project, mm.description "
+                         "FROM chunks ch JOIN memories mm ON mm.id = ch.memory_id "
+                         "WHERE mm.status='pending' AND mm.path != ?", (rec["path"],)).fetchall()
+        c.close()
+        if not rows:
+            return []
+        mean = m.mean(axis=0)
+        q = np.asarray(rec["vectors"], dtype="float32") - mean
+        q /= np.linalg.norm(q, axis=1, keepdims=True) + 1e-9
+        cids = np.array([r["cid"] for r in rows], dtype=int)
+        pos = np.clip(np.searchsorted(ids, cids), 0, len(ids) - 1)
+        ok = ids[pos] == cids
+        p = m[pos] - mean
+        p /= np.linalg.norm(p, axis=1, keepdims=True) + 1e-9
+        sims = (p @ q.T).max(axis=1)
+        best = {}
+        for r, s, good in zip(rows, sims, ok, strict=True):
+            key = (r["name"], r["project"])
+            if good and s >= threshold and s > best.get(key, ({}, -1.0))[1]:
+                best[key] = ({"name": r["name"], "project": r["project"],
+                              "description": r["description"] or ""}, float(s))
+        top = sorted(best.values(), key=lambda x: -x[1])[:limit]
+        return [dict(d, similarity=round(s, 2)) for d, s in top]
 
     def list(self, project=""):
         c = self.connect()

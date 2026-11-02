@@ -44,27 +44,43 @@ def create_app(cfg, store=None, warmup=True):
     def read_memory(name: str) -> str:
         return json.dumps(store.get(name), ensure_ascii=False, indent=1)
 
+    def with_hint(res):
+        if res.get("related_pending"):
+            res["hint"] = say("related_hint")
+        return json.dumps(res, ensure_ascii=False)
+
     @mcp.tool(description="Create or update a memory. Link to others with [[other-name]] in "
                           "the body. type: project | reference | feedback | user. status: "
                           "active | pending | resolved | superseded (empty keeps the current).")
     def save_memory(name: str, description: str, body: str, type: str = "project",
                     project: str = "general", status: str = "") -> str:
-        return json.dumps(store.save(name, description, body, type, project, status or None),
-                          ensure_ascii=False)
+        return with_hint(store.save(name, description, body, type, project, status or None))
 
     @mcp.tool(description="Change a memory's status (active | pending | resolved | "
                           "superseded) and append a dated note saying why. Use it when a "
                           "pending item gets done.")
     def mark_memory(name: str, status: str, note: str = "") -> str:
-        return json.dumps(store.mark(name, status, note), ensure_ascii=False)
+        return with_hint(store.mark(name, status, note))
 
-    @mcp.tool(description="List memories marked as pending (what is still to be done). "
-                          "Optional project filter.")
-    def list_pending(project: str = "") -> str:
+    @mcp.tool(description="List memories marked as pending (what is still to be done), "
+                          "oldest first, with the date each was opened and of its last note. "
+                          "Optional project filter; page with limit and offset.")
+    def list_pending(project: str = "", limit: int = 50, offset: int = 0) -> str:
         rows = store.pending(project)
-        return "\n".join("- [%s] %s (%s): %s" % (r["project"], r["name"],
-                                                (r["modified"] or "")[:10], r["description"] or "")
-                         for r in rows) or say("no_pending")
+        if not rows:
+            return say("no_pending")
+        offset, limit = max(0, offset), max(1, min(limit, 200))
+        page = rows[offset:offset + limit]
+        out = [say("pending_head", total=len(rows), a=offset + 1, b=offset + len(page))]
+        for r in page:
+            dates = say("pending_since", d=r["since"]) + (
+                ", " + say("pending_note", d=r["last_note"]) if r["last_note"] else "")
+            desc = " ".join((r["description"] or "").split())
+            out.append("- [%s] %s (%s): %s" % (r["project"], r["name"], dates,
+                                               desc[:160] + ("..." if len(desc) > 160 else "")))
+        if offset + len(page) < len(rows):
+            out.append(say("pending_more", n=offset + len(page)))
+        return "\n".join(out)
 
     @mcp.tool(description="List the memories of a project; without arguments, list projects.")
     def list_memories(project: str = "") -> str:

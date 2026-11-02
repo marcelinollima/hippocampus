@@ -69,6 +69,20 @@ def test_import_endpoint_indexes_new_files(store):
                   json={"files": [{"path": "../x.md", "content": ""}]}).status_code == 400
 
 
+def test_list_pending_tool_pages_oldest_first(store):
+    for i in range(3):
+        store.save("todo-%d" % i, "x" * 300, "Something to do %d." % i, project="infra",
+                   status="pending")
+    call = {"jsonrpc": "2.0", "id": 1, "method": "tools/call",
+            "params": {"name": "list_pending", "arguments": {"limit": 2, "offset": 1}}}
+    hdrs = {"Accept": "application/json, text/event-stream", **AUTH}
+    with client(store) as c:
+        out = c.post("/mcp", json=call, headers=hdrs).text
+    assert "4 pending, oldest first. Showing 2-3." in out
+    assert "orders-report-mismatch" not in out and "todo-0" in out and "todo-2" not in out
+    assert "offset=3" in out and "x" * 161 not in out
+
+
 def test_search_endpoint_answers_in_the_language_asked(store):
     c = client(store)
     body = {"q": "deploy the shop api", "pinned": True, "expand": False}

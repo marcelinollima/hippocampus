@@ -79,6 +79,34 @@ def test_mark_appends_dated_note_and_keeps_body(store):
     assert store.pending() == []
 
 
+def test_pending_shows_since_and_last_note(store):
+    store.mark("orders-report-mismatch", "pending", "Finance meeting set for Friday.")
+    (p,) = store.pending()
+    assert p["since"] == "2026-03-12"  # same status: the opening date does not move
+    assert p["last_note"] and p["last_note"] > p["since"]
+    assert "body" not in p
+
+
+def test_pending_is_oldest_first(store):
+    store.save("newer-todo", "d", "Rotate the VPN keys.", project="infra", status="pending")
+    assert [p["name"] for p in store.pending()] == ["orders-report-mismatch", "newer-todo"]
+
+
+def test_save_points_to_related_pending(store, monkeypatch):
+    # the bag-of-words test vectors sit lower than the real model's; the
+    # threshold itself is calibrated on real memories, not here
+    monkeypatch.setattr("hippocampus.store.RELATED_THRESHOLD", 0.40)
+    r = store.save("finance-decision", "Finance decided the salesperson rule",
+                   "Finance decided: the dashboard and the monthly report credit the order "
+                   "to whoever closed it. Report mismatch per salesperson fixed.",
+                   project="shop-api")
+    assert [x["name"] for x in r["related_pending"]] == ["orders-report-mismatch"]
+    # a memory never points to itself, and unrelated ones get nothing
+    assert "related_pending" not in store.mark("orders-report-mismatch", "pending", "still open")
+    assert "related_pending" not in store.save("nas-fan", "d", "Replaced the NAS fan.",
+                                               project="infra")
+
+
 def test_save_without_status_keeps_previous(store):
     store.save("orders-report-mismatch", "d", "changed body", project="shop-api")
     assert store.get("orders-report-mismatch")["status"] == "pending"

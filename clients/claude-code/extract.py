@@ -38,7 +38,8 @@ Do, in this order:
 
 1. RESOLVED ITEMS. For each thing the session provably finished (the record
    shows the result, or the user said it was done):
-   - find the memory that tracked it (list_pending and search_memory);
+   - find the memory that tracked it (search_memory first; list_pending is
+     paged, oldest first);
    - if ALL of that memory's pending work is done: mark_memory with status
      "resolved" and a short note (what was done + date);
    - if only PART of it is done: mark_memory with status "pending" and a note
@@ -57,6 +58,11 @@ Do, in this order:
    (keeps its status and appends a note) over rewriting it. If you must use
    save_memory on an existing memory, read it first with read_memory and keep
    ALL the old content - never shorten it.
+
+4. RELATED PENDING ITEMS. save_memory and mark_memory may answer with
+   `related_pending`: open items that look like what you just saved. For each
+   one, read it and apply rule 1: resolve it only if the record proves it was
+   done, note partial progress, and leave unrelated ones alone.
    New memories: `project` = the subject's project; link to existing ones with
    [[name]]; plain language; absolute dates. Write in {language}.
 

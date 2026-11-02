@@ -28,6 +28,14 @@ memories about unfinished work start as pending. For "what is still pending?",
 use list_pending.""",
         "not_found": "No memory found for: {q}",
         "no_pending": "(no pending memories)",
+        "pending_head": "{total} pending, oldest first. Showing {a}-{b}.",
+        "pending_since": "open since {d}",
+        "pending_note": "last note {d}",
+        "pending_more": "More: list_pending(offset={n}).",
+        "related_hint": "These pending memories look like what was just saved. If this "
+                        "work finished one of them, call mark_memory on it with status "
+                        "resolved; if it moved one forward, mark it pending with a note. "
+                        "If they are unrelated, ignore them.",
         "empty": "(empty)",
         "n_memories": "{n} memories",
         "ctx_title": "# Relevant memories for: {q}",
@@ -57,6 +65,15 @@ Memória nova sobre trabalho inacabado nasce como pending. Para "o que está
 pendente?", use list_pending. Escreva as memórias em português.""",
         "not_found": "Nenhuma memória encontrada para: {q}",
         "no_pending": "(nenhuma memória pendente)",
+        "pending_head": "{total} pendentes, das mais antigas para as mais novas. "
+                        "Mostrando {a}-{b}.",
+        "pending_since": "aberta em {d}",
+        "pending_note": "última nota {d}",
+        "pending_more": "Mais: list_pending(offset={n}).",
+        "related_hint": "Estas memórias pendentes parecem com o que acabou de ser gravado. "
+                        "Se este trabalho concluiu alguma, chame mark_memory nela com status "
+                        "resolved; se só avançou, marque pending com uma nota. Se não têm "
+                        "relação, ignore.",
         "empty": "(vazio)",
         "n_memories": "{n} memórias",
         "ctx_title": "# Memórias relevantes para: {q}",
