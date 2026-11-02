@@ -292,6 +292,17 @@ hippocampus stats                 # counts, broken links, pending items
 hippocampus token                 # generate a random token
 ```
 
+Pending items pile up when the fix is written somewhere else. To review them,
+run the Claude Code client's reviewer (it uses `claude -p`, with no tools):
+
+```
+python ~/.hippocampus/hooks/review.py            # report: which pending items look done
+python ~/.hippocampus/hooks/review.py --apply ~/.hippocampus/review-<date>.json
+```
+
+It only marks what the report lists as resolved **with a quote as proof**, and
+you can veto any item by setting `"apply": false` in the .json first.
+
 ## Project status
 
 Hippocampus came out of its author's daily work, where it holds 360+

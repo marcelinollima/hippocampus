@@ -15,6 +15,10 @@ somewhere else.
   work finished them. Threshold calibrated on real memories (centered cosine 0.50).
 - The extraction hook acts on `related_pending`, with the same "only with
   evidence" rule.
+- `/api/review` and `clients/claude-code/review.py`: review the pending
+  backlog. Each pending memory goes to `claude -p` (no tools) with the newer
+  memories that look like it; the result is a report, and `--apply` marks as
+  resolved only the items approved in it, each with the quote that proves it.
 
 ### Changed
 - `list_pending` is paged (`limit`, default 50, and `offset`), oldest first, with

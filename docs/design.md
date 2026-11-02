@@ -78,6 +78,24 @@ different corpus may want a different value.
 `list_pending` is paged and oldest first for the same reason: with 400 items
 it returned over 100k characters and clients refused the answer.
 
+### Reviewing the backlog
+
+The hint only helps from now on. For what had already piled up,
+`/api/review` returns every pending memory with its body (the start, which
+keeps the context, and the end, where the newest notes are) and up to 3
+memories written **after** it was opened that look like it. The server has no
+language model, so the judging happens on the client: `review.py` sends
+batches of 8 to `claude -p`, which gets no tools at all (a memory body could
+contain anything) and answers JSON. Guard rails:
+
+- "resolved" needs a quote; without one it is downgraded to "unsure";
+- similar topic, a plan or partial progress are spelled out as not enough;
+- nothing is marked until `--apply`, and only items whose `apply` is still
+  `true` in the report the user read.
+
+On the author's 417 pending items the first pilot (16 oldest) found two that
+said "RESOLVED" in their own body, the case that started all this.
+
 ## The recall hook must be cheap and must never fail loudly
 
 It runs on **every** prompt, so:

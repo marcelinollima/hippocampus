@@ -303,6 +303,18 @@ hippocampus stats                 # contagens, links quebrados, pendências
 hippocampus token                 # gera um token aleatório
 ```
 
+Pendências se acumulam quando a solução fica escrita em outro lugar. Para
+revisá-las, rode o revisor do cliente do Claude Code (usa `claude -p`, sem
+nenhuma ferramenta):
+
+```
+python ~/.hippocampus/hooks/review.py            # relatório: quais pendências parecem feitas
+python ~/.hippocampus/hooks/review.py --apply ~/.hippocampus/review-<data>.json
+```
+
+Ele só marca o que o relatório dá como resolvido **com uma citação de prova**,
+e você pode vetar qualquer item pondo `"apply": false` no .json antes.
+
 ## Estado do projeto
 
 O Hippocampus nasceu do trabalho diário do autor, onde guarda mais de 360
