@@ -51,10 +51,13 @@
   .res p{margin:2px 0;color:var(--dim);font-size:12px}
   .via{font-size:11px;color:var(--accent)}
   .legend{position:fixed;left:12px;bottom:12px;z-index:5;font-size:11px;color:var(--dim);
-    max-width:230px;max-height:38vh;overflow:auto}
-  .legend div{cursor:pointer;padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    max-width:230px}
+  #legList{max-height:38vh;overflow:auto;transition:transform .22s ease,opacity .22s ease}
+  .legend.collapsed #legList{transform:translateX(calc(-100% - 16px));opacity:0;pointer-events:none}
+  #legList div{cursor:pointer;padding:1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
-  .legend div.off{opacity:.3}
+  #legList div.off{opacity:.3}
+  #legToggle{font-size:11px;padding:3px 8px;margin-top:6px;color:var(--dim);background:rgba(22,32,58,.85)}
   .field{margin-bottom:10px}
   .field label{display:block;font-size:12px;color:var(--dim);margin-bottom:3px}
   .field input,.field textarea,.field select{width:100%}
@@ -90,7 +93,10 @@
   <span class="stats" id="stats"></span>
 </div>
 
-<div class="legend hidden" id="legend"></div>
+<div class="legend hidden" id="legend">
+  <div id="legList"></div>
+  <button id="legToggle" onclick="toggleLegend()"></button>
+</div>
 <div class="panel" id="panel"></div>
 
 <script>
@@ -105,7 +111,7 @@ const I18N = {
     editMemory:"Edit memory", newMem:"New memory", name:"name (slug)",
     description:"description (one line)", type:"type", project:"project", status:"status",
     body:"body (markdown · use [[other-memory]] to link)", save:"Save", saving:"saving…",
-    required:"name and body are required"},
+    required:"name and body are required", projects:"projects"},
   pt: {memories:"memórias", pasteToken:"Cole o token de acesso", enter:"Entrar",
     badToken:"Token inválido.", search:"Buscar", newMemory:"+ memória",
     placeholder:"pergunte: “por que o servidor de backup está em 100% de CPU?”",
@@ -116,7 +122,7 @@ const I18N = {
     editMemory:"Editar memória", newMem:"Nova memória", name:"nome (slug)",
     description:"descrição (1 linha)", type:"tipo", project:"projeto", status:"status",
     body:"corpo (markdown · use [[outra-memoria]] para ligar)", save:"Gravar", saving:"gravando…",
-    required:"nome e corpo são obrigatórios"},
+    required:"nome e corpo são obrigatórios", projects:"projetos"},
 };
 // storage can be unavailable (private windows, blocked site data)
 const store = {
@@ -146,6 +152,7 @@ let TOKEN = store.get("hippocampus_token") || "";
 let data = {nodes:[], edges:[], suggestions:[]};
 let sim, node, edge, suggested, label, hidden = new Set();
 let showSug = store.get("hippocampus_sug") !== "off";
+let legendCollapsed = store.get("hippocampus_legend") === "off";
 const colors = d3.scaleOrdinal(d3.schemeTableau10.concat(d3.schemeSet3));
 
 function api(route, opt={}){
@@ -253,7 +260,9 @@ function draw(){
     });
 
   const projects = [...new Set(nodes.map(d=>d.project))].sort();
-  const leg = d3.select("#legend").html("");
+  const leg = d3.select("#legList").html("");
+  document.getElementById("legend").classList.toggle("collapsed", legendCollapsed);
+  legendLabel(projects.length);
   projects.forEach(p => {
     const n = nodes.filter(x=>x.project===p).length;
     leg.append("div").classed("off", hidden.has(p))
@@ -273,6 +282,18 @@ function filterProjects(){
   label.style("display", d => vis(d) ? null : "none");
   edge.style("display", d => vis(d.source) && vis(d.target) ? null : "none");
   suggested.style("display", d => vis(d.source) && vis(d.target) ? null : "none");
+}
+
+function legendLabel(n){
+  document.getElementById("legToggle").textContent =
+    (legendCollapsed ? "▸ " : "◂ ") + t("projects") + " (" + n + ")";
+}
+
+function toggleLegend(){
+  legendCollapsed = !legendCollapsed;
+  store.set("hippocampus_legend", legendCollapsed ? "off" : "on");
+  document.getElementById("legend").classList.toggle("collapsed", legendCollapsed);
+  legendLabel(document.getElementById("legList").children.length);
 }
 
 function toggleSuggestions(){
