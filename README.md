@@ -17,6 +17,8 @@ English · [Português](README.pt-BR.md)
 
 ---
 
+[![Hippocampus in 15 seconds: every session starts from zero, one memory for all of them, a search lights up the matches, and three signals become what Claude receives](docs/img/showreel.gif)](docs/img/showreel.mp4)
+
 Hippocampus is an **MCP memory server** you run yourself. It stores memories
 as plain Markdown files, indexes them in SQLite, and finds them with **hybrid
 search: BM25 keywords + vector embeddings + a knowledge graph** of links that

@@ -17,6 +17,8 @@ Um servidor de memória só, compartilhado por todas as sessões, todos os proje
 
 ---
 
+[![Hippocampus em 15 segundos: cada sessão começa do zero, uma memória para todas, a busca acende o que encontrou e três sinais viram o que o Claude recebe](docs/img/showreel.gif)](docs/img/showreel.mp4)
+
 O Hippocampus é um **servidor de memória MCP** que você mesmo roda. Ele guarda
 as memórias como arquivos Markdown comuns, indexa tudo em SQLite e encontra o
 que importa com **busca híbrida: palavras-chave BM25 + embeddings vetoriais +
